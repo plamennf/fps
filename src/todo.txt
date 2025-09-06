@@ -1,0 +1,9 @@
+- Make a resource manager:
+   - When loading a mesh check whether the gltf version of it is new and load it, otherwise load the .mesh version
+- Integrate ImGui with docking:
+  - Add mouse picking, which then opens a menu in ImGui with properties of the mesh and with the ability to change stuff about the material.
+  - Add ability to save mesh after changes have been made.
+- Add shadows.
+- Add PBR.
+- Add multithreaded asset loading.
+- Add menu.

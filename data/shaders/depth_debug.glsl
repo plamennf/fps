@@ -1,0 +1,35 @@
+OUT_IN vec4 vertex_color;
+OUT_IN vec2 vertex_uv;
+
+#ifdef VERTEX_SHADER
+
+layout(location = 0) in vec2 input_position;
+layout(location = 1) in vec4 input_color;
+layout(location = 2) in vec2 input_uv;
+
+uniform mat4 projection_matrix;
+uniform mat4 view_matrix;
+uniform mat4 world_matrix;
+
+void main(void) {
+    gl_Position  = vec4(input_position, 0.0, 1.0);
+    vertex_color = input_color;
+    vertex_uv    = input_uv;
+}
+
+#endif
+
+#ifdef FRAGMENT_SHADER
+
+layout(location = 0) out vec4 output_color;
+
+uniform sampler2DArray shadow_map_texture;
+uniform int cascade;
+uniform vec2 screen_size;
+
+void main(void) {
+    float depth = texture(shadow_map_texture, vec3(vertex_uv.xy / screen_size, cascade)).r;
+    output_color = vec4(vec3(depth), 1.0);
+}
+
+#endif
