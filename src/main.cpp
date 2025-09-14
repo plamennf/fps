@@ -2,6 +2,7 @@
 #include "renderer.h"
 #include "font.h"
 #include "mesh.h"
+#include "mesh_catalog.h"
 
 #include <SDL3/SDL_main.h>
 #include <GL/glew.h>
@@ -198,6 +199,8 @@ int main(int argc, char *argv[]) {
     init_renderer(globals.window);
     init_shaders();
     init_framebuffers();
+
+    globals.mesh_catalog = new Mesh_Catalog();
     
     init_camera(&globals.camera, v3(0, 2, 0), 0.0f, 0.0f, 0.0f);
     
@@ -207,8 +210,9 @@ int main(int argc, char *argv[]) {
     u8 black_texture_data[4] = { 0x00, 0x00, 0x00, 0xFF };
     globals.black_texture = make_texture(1, 1, TEXTURE_FORMAT_RGBA8, black_texture_data);
     
-    globals.mesh = new Mesh();
-    if (!load_mesh(globals.mesh, "data/meshes/Yeti.gltf")) return 1;
+    globals.mesh = globals.mesh_catalog->find_or_load("Yeti");
+    if (!globals.mesh) return 1;
+    //if (!load_mesh(globals.mesh, "data/meshes/Yeti.gltf")) return 1;
     //if (!load_mesh(globals.mesh, "data/meshes/knight.gltf")) return 1;
     //if (!load_mesh(globals.mesh, "data/meshes/knight.mesh")) return 1;
     

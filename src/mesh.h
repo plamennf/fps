@@ -1,8 +1,12 @@
 #pragma once
 
+#include "geometry.h"
+
 #define MESH_FILE_VERSION 1
 
 struct Mesh_Vertex;
+struct Texture;
+struct Gpu_Buffer;
 
 struct Material {
     Texture *diffuse_texture;

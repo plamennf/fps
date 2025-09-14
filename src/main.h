@@ -19,6 +19,7 @@ const float CAMERA_Z_FAR  = 500.0f;
 
 struct Mesh;
 struct Framebuffer;
+struct Mesh_Catalog;
 
 enum Render_Stage {
     RENDER_STAGE_SHADOW,
@@ -82,6 +83,8 @@ struct Global_Variables {
     Directional_Light directional_light = {};
     Point_Light point_lights[MAX_POINT_LIGHTS] = {};
     Spot_Light spot_light = {};
+
+    Mesh_Catalog *mesh_catalog = NULL;
 };
 
 extern Global_Variables globals;
