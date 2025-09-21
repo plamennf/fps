@@ -20,7 +20,6 @@ if %BuildDebug%==1 set LinkerFlags= /LIBPATH:"..\external\lib\Debug" %LinkerFlag
 if %BuildDebug%==0 set LinkerFlags= /LIBPATH:"..\external\lib\Release" %LinkerFlags%
 
 cl %CompilerFlags% %Defines% /Fe:"fps" ..\src\*.cpp /link %LinkerFlags% %Libs%
-REM cl %CompilerFlags% %Defines% /Fe:"fps" ..\src2\win32_main.cpp /link %LinkerFlags% %Libs%
 
 xcopy /y /d ..\external\lib\*.dll
 REM if %BuildSlow%==1 xcopy /y /d ..\external\lib\Debug\*.dll

@@ -368,6 +368,12 @@ void set_framebuffer(Framebuffer *_framebuffer, bool clear_color, Vector4 color,
     glClear(clear_flags);
 }
 
+void *get_color_texture_native(Framebuffer *_framebuffer) {
+    assert(_framebuffer);
+    Framebuffer_Gl *framebuffer = (Framebuffer_Gl *)_framebuffer;
+    return (void *)((u64)framebuffer->color_id);
+}
+
 Gpu_Buffer *make_gpu_buffer(Gpu_Buffer_Type type, u32 size, void *data, bool is_dynamic) {
     Gpu_Buffer_Gl *buffer = add_gpu_buffer();
     buffer->type = type;

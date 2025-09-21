@@ -1,6 +1,3 @@
-- Integrate ImGui with docking:
-  - Add mouse picking, which then opens a menu in ImGui with properties of the mesh and with the ability to change stuff about the material.
-  - Add ability to save mesh after changes have been made.
 - Add shadows.
 - Add PBR.
 - Add multithreaded asset loading.

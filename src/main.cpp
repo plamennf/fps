@@ -199,7 +199,7 @@ int main(int argc, char *argv[]) {
     init_renderer(globals.window);
     init_shaders();
     init_framebuffers();
-
+    
     globals.mesh_catalog = new Mesh_Catalog();
     
     init_camera(&globals.camera, v3(0, 2, 0), 0.0f, 0.0f, 0.0f);

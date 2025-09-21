@@ -154,6 +154,7 @@ void set_shadow_map(Framebuffer *framebuffer);
 Framebuffer *make_framebuffer(int width, int height, Texture_Format color_format, Texture_Format depth_format);
 void destroy_framebuffer(Framebuffer *framebuffer);
 void set_framebuffer(Framebuffer *framebuffer, bool clear_color, Vector4 color, bool clear_depth, float z, bool clear_stencil, u8 stencil);
+void *get_color_texture_native(Framebuffer *framebuffer);
 
 Gpu_Buffer *make_gpu_buffer(Gpu_Buffer_Type type, u32 size, void *data, bool is_dynamic);
 void set_vertex_buffer(Gpu_Buffer *vertex_buffer);
