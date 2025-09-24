@@ -25,10 +25,12 @@ struct Shader_Gl : public Shader {
     GLint diffuse_texture;
     GLint specular_texture;
     GLint normal_texture;
+    GLint shadow_map_texture;
 
     GLint projection_matrix;
     GLint view_matrix;
     GLint world_matrix;
+    GLint light_matrix;
     
     GLint material_color;
     GLint material_shininess;

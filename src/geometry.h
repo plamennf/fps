@@ -310,6 +310,18 @@ inline Vector3 make_vector3(Vector2 xy, float z) {
     result.x = xy.x;
     result.y = xy.y;
     result.z = z;
+
+    return result;
+}
+
+inline Vector3 operator-(Vector3 a) {
+    Vector3 result;
+
+    result.x = -a.x;
+    result.y = -a.y;
+    result.z = -a.z;
+
+    return result;
 }
 
 inline Vector3 operator+(Vector3 a, Vector3 b) {

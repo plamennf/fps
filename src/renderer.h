@@ -65,6 +65,7 @@ enum Texture_Format {
     TEXTURE_FORMAT_R8,
 
     TEXTURE_FORMAT_D24S8,
+    TEXTURE_FORMAT_SHADOW_MAP,
 };
 
 enum Texture_Type {
@@ -131,6 +132,7 @@ struct Transform {
     Matrix4 projection_matrix;
     Matrix4 view_matrix;
     Matrix4 world_matrix;
+    Matrix4 light_matrix;
 };
 
 void init_renderer(SDL_Window *window);
@@ -154,7 +156,6 @@ void set_shadow_map(Framebuffer *framebuffer);
 Framebuffer *make_framebuffer(int width, int height, Texture_Format color_format, Texture_Format depth_format);
 void destroy_framebuffer(Framebuffer *framebuffer);
 void set_framebuffer(Framebuffer *framebuffer, bool clear_color, Vector4 color, bool clear_depth, float z, bool clear_stencil, u8 stencil);
-void *get_color_texture_native(Framebuffer *framebuffer);
 
 Gpu_Buffer *make_gpu_buffer(Gpu_Buffer_Type type, u32 size, void *data, bool is_dynamic);
 void set_vertex_buffer(Gpu_Buffer *vertex_buffer);
@@ -177,6 +178,7 @@ void immediate_quad(Vector2 position, Vector2 size, Vector4 color);
 
 void rendering_2d();
 void rendering_3d();
+void rendering_3d_shadow_map();
 
 void draw_text(Font *font, char *text, int x, int y, Vector4 color);
 

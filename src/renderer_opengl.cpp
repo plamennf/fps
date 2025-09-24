@@ -250,10 +250,18 @@ void set_color_texture(Framebuffer *_framebuffer) {
     glBindTexture(GL_TEXTURE_2D, framebuffer->color_id);
 }
 
+void set_shadow_map(Framebuffer *_framebuffer) {
+    assert(_framebuffer);
+    Framebuffer_Gl *framebuffer = (Framebuffer_Gl *)_framebuffer;
+
+    glActiveTexture(GL_TEXTURE3);
+    glBindTexture(GL_TEXTURE_2D, framebuffer->depth_id);
+}
+
 Framebuffer *make_framebuffer(int width, int height, Texture_Format color_format, Texture_Format depth_format) {
     assert(color_format != TEXTURE_FORMAT_UNKNOWN || depth_format != TEXTURE_FORMAT_UNKNOWN);
     assert(color_format == TEXTURE_FORMAT_RGBA8 || color_format == TEXTURE_FORMAT_UNKNOWN);
-    assert(depth_format == TEXTURE_FORMAT_D24S8 || depth_format == TEXTURE_FORMAT_UNKNOWN);
+    assert(depth_format == TEXTURE_FORMAT_D24S8 || depth_format == TEXTURE_FORMAT_SHADOW_MAP || depth_format == TEXTURE_FORMAT_UNKNOWN);
 
     Framebuffer_Gl *framebuffer = add_framebuffer();
 
@@ -271,7 +279,11 @@ Framebuffer *make_framebuffer(int width, int height, Texture_Format color_format
     }
 
     if (depth_format != TEXTURE_FORMAT_UNKNOWN) {
-        glGenRenderbuffers(1, &framebuffer->depth_id);
+        if (depth_format == TEXTURE_FORMAT_SHADOW_MAP) {
+            glGenTextures(1, &framebuffer->depth_id);
+        } else {
+            glGenRenderbuffers(1, &framebuffer->depth_id);
+        }
     }
 
     /*
@@ -301,9 +313,28 @@ Framebuffer *make_framebuffer(int width, int height, Texture_Format color_format
     }
 
     if (depth_format != TEXTURE_FORMAT_UNKNOWN) {
-        glBindRenderbuffer(GL_RENDERBUFFER, framebuffer->depth_id);
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height);
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, framebuffer->depth_id);
+        if (depth_format == TEXTURE_FORMAT_SHADOW_MAP) {
+            glBindTexture(GL_TEXTURE_2D, framebuffer->depth_id);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, width, height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+#if 0
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+#else
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+#endif
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER); 
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+            float border_color[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+            glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, border_color);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, framebuffer->depth_id, 0);
+            glDrawBuffer(GL_NONE);
+            glReadBuffer(GL_NONE);
+        } else {
+            glBindRenderbuffer(GL_RENDERBUFFER, framebuffer->depth_id);
+            glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height);
+            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, framebuffer->depth_id);
+        }
     }
 //}
 
@@ -366,12 +397,6 @@ void set_framebuffer(Framebuffer *_framebuffer, bool clear_color, Vector4 color,
     }
 
     glClear(clear_flags);
-}
-
-void *get_color_texture_native(Framebuffer *_framebuffer) {
-    assert(_framebuffer);
-    Framebuffer_Gl *framebuffer = (Framebuffer_Gl *)_framebuffer;
-    return (void *)((u64)framebuffer->color_id);
 }
 
 Gpu_Buffer *make_gpu_buffer(Gpu_Buffer_Type type, u32 size, void *data, bool is_dynamic) {
@@ -580,11 +605,13 @@ Shader *load_shader(char *filepath, Render_Vertex_Type vertex_type) {
     GUL(diffuse_texture);
     GUL(specular_texture);
     GUL(normal_texture);
+    GUL(shadow_map_texture);
     GUL(projection_matrix);
     GUL(view_matrix);
     GUL(world_matrix);
     GUL(num_multisamples);
     GUL(camera_position);
+    GUL(light_matrix);
 #undef GUL
 
     shader->material_color     = glGetUniformLocation(p, "material.color");
@@ -635,6 +662,7 @@ Shader *load_shader(char *filepath, Render_Vertex_Type vertex_type) {
     glUniform1i(shader->diffuse_texture, 0);
     glUniform1i(shader->specular_texture, 1);
     glUniform1i(shader->normal_texture, 2);
+    glUniform1i(shader->shadow_map_texture, 3);
     glUseProgram(0);
     
     return (Shader *)shader;
@@ -699,6 +727,7 @@ void refresh_transform() {
         set_matrix4(shader->projection_matrix, globals.transform.projection_matrix);
         set_matrix4(shader->view_matrix, globals.transform.view_matrix);
         set_matrix4(shader->world_matrix, globals.transform.world_matrix);
+        set_matrix4(shader->light_matrix, globals.transform.light_matrix);
     }
 }
 

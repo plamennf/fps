@@ -10,8 +10,8 @@
 
 #include "renderer.h"
 
-const int SHADOW_WIDTH  = 4096;
-const int SHADOW_HEIGHT = 4096;
+const int SHADOW_MAP_WIDTH  = 4096;
+const int SHADOW_MAP_HEIGHT = 4096;
 
 const float CAMERA_FOV = 90.0f;
 const float CAMERA_Z_NEAR = 0.1f;
@@ -51,7 +51,8 @@ struct Global_Variables {
 
     Time_Info time_info = {};
 
-    float mouse_sensitivity = 0.1f;
+    //float mouse_sensitivity = 0.1f; // @PC
+    float mouse_sensitivity = 0.2f; // @Laptop
     
     float mouse_x_delta = 0;
     float mouse_y_delta = 0;
@@ -68,6 +69,7 @@ struct Global_Variables {
     Texture *black_texture = NULL;
 
     Framebuffer *offscreen_buffer = NULL;
+    Framebuffer *shadow_map_buffer = NULL;
     
     Shader *shader_color = NULL;
     Shader *shader_texture = NULL;
@@ -83,6 +85,8 @@ struct Global_Variables {
     Directional_Light directional_light = {};
     Point_Light point_lights[MAX_POINT_LIGHTS] = {};
     Spot_Light spot_light = {};
+
+    Render_Stage render_stage = RENDER_STAGE_MAIN;
 
     Mesh_Catalog *mesh_catalog = NULL;
 };

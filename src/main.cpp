@@ -24,6 +24,10 @@ static void init_framebuffers() {
         destroy_framebuffer(globals.offscreen_buffer);
         globals.offscreen_buffer = NULL;
     }
+
+    if (!globals.shadow_map_buffer) {
+        globals.shadow_map_buffer = make_framebuffer(SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT, TEXTURE_FORMAT_UNKNOWN, TEXTURE_FORMAT_SHADOW_MAP);
+    }
     
     globals.offscreen_buffer = make_framebuffer(globals.window_width, globals.window_height, TEXTURE_FORMAT_RGBA8, TEXTURE_FORMAT_D24S8);
 }
@@ -39,10 +43,10 @@ static void init_shaders() {
 }
 
 static void init_lights() {
-    globals.directional_light.direction = v3(-0.2f, -1.0f, -0.3f);
-    globals.directional_light.ambient   = v3(0.05f, 0.05f, 0.05f);
-    globals.directional_light.diffuse   = v3(0.4f, 0.4f, 0.4f);
-    globals.directional_light.specular  = v3(0.5f, 0.5f, 0.5f);
+    globals.directional_light.direction = v3(-0.981f, -0.196f, 0.0f);
+    globals.directional_light.ambient   = v3(0.2f, 0.1f, 0.05f);
+    globals.directional_light.diffuse   = v3(0.8f, 0.5f, 0.3f);
+    globals.directional_light.specular  = v3(0.5f, 0.3f, 0.3f);
     
     globals.point_lights[0].position  = v3(0.0f, 10.0f, 0.0f);
     globals.point_lights[0].ambient   = v3(0.05f, 0.05f, 0.05f);
@@ -95,7 +99,7 @@ static void resolve_to_screen() {
 static void draw_scene() {
     draw_cube(v3(0, -1, 0), v3(0, 0, 0), v3(200, 2.0f, 200.0f), v4(0, 1, 0, 1));
     draw_cube(v3(1, 1, -25), v3(0, 0, 0), v3(2, 2, 2), v4(0, 0, 1, 1));
-    draw_mesh(globals.mesh, v3(0, 0, -50), v3(0, 0, 0), 1.0f);
+    draw_mesh(globals.mesh, v3(0, 0, -50), v3(0, 90, 0), 1.0f);
     //draw_mesh(globals.mesh, v3(0, 0, -50), v3(0, 0, 0), 0.01f);
 }
 
@@ -103,8 +107,15 @@ static void draw_one_frame() {
     // Reset the depth write before clearing as set_depth_write(false) before 2D drawing
     // disables the depth write, which in turn means the depth clear won't work
     set_depth_write(true);
+
+    // Shadows Drawing:
+    globals.render_stage = RENDER_STAGE_SHADOW;
+    set_framebuffer(globals.shadow_map_buffer, false, v4(0, 0, 0, 0), true, 1.0f, false, 0);
+    rendering_3d_shadow_map();
+    draw_scene();
     
     // Normal 3D Drawing:
+    globals.render_stage = RENDER_STAGE_MAIN;
     set_framebuffer(globals.offscreen_buffer, true, v4(0.2f, 0.5f, 0.8f, 1.0f), true, 1.0f, false, 0);
     rendering_3d();
     draw_scene();

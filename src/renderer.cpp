@@ -173,6 +173,22 @@ void rendering_3d() {
     set_cull_face(CULL_FACE_BACK);
 }
 
+void rendering_3d_shadow_map() {
+    float half_scene_size = 250.0f;
+    Matrix4 light_projection = make_orthographic(-half_scene_size, half_scene_size, -half_scene_size, half_scene_size, 0.1f, 1000.0f);
+    //Matrix4 light_view = make_look_at_matrix(globals.directional_light.direction * -500.0f, v3(0, 0, 0), v3(0, 1, 0));
+    Matrix4 light_view = make_look_at_matrix(globals.directional_light.direction * -1.0f, v3(0, 0, 0), v3(0, 1, 0));
+    globals.transform.light_matrix = light_projection * light_view;
+
+    refresh_transform();
+
+    set_blend_mode(BLEND_MODE_OFF);
+    set_depth_test(DEPTH_TEST_LESS);
+    set_cull_face(CULL_FACE_FRONT);
+
+    set_shadow_map(globals.shadow_map_buffer);
+}
+
 void draw_text(Font *font, char *text, int x, int y, Vector4 color) {
     set_shader(globals.shader_texture);
     set_texture(TEXTURE_DIFFUSE, font->texture);
@@ -220,10 +236,14 @@ void draw_text(Font *font, char *text, int x, int y, Vector4 color) {
 }
 
 void draw_mesh(Mesh *mesh, Vector3 position, Vector3 rotation, float scale) {
+    if (globals.render_stage == RENDER_STAGE_MAIN) {
+        set_shader(globals.shader_basic);
+    } else {
+        set_shader(globals.shader_depth);
+    }
+
     globals.transform.world_matrix = make_transformation_matrix(position, rotation, scale);
     refresh_transform();
-
-    set_shader(globals.shader_basic);
     
     for (int i = 0; i < mesh->num_submeshes; i++) {
         Submesh *submesh = &mesh->submeshes[i];
@@ -244,11 +264,15 @@ void draw_mesh(Mesh *mesh, Vector3 position, Vector3 rotation, float scale) {
 }
 
 void draw_cube(Vector3 position, Vector3 rotation, Vector3 scale, Vector4 color) {
+    if (globals.render_stage == RENDER_STAGE_MAIN) {
+        set_shader(globals.shader_basic);
+    } else {
+        set_shader(globals.shader_depth);
+    }
+
     globals.transform.world_matrix = make_transformation_matrix(position, rotation, scale);
     refresh_transform();
-
-    set_shader(globals.shader_basic);
-
+    
     set_vertex_buffer(cube_vertex_buffer);
     set_index_buffer(cube_index_buffer);
 

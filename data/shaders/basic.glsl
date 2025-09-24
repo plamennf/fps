@@ -3,6 +3,7 @@ OUT_IN vec3 world_normal;
 OUT_IN vec3 world_position;
 OUT_IN vec3 vertex_pos_view_space;
 OUT_IN mat3 TBN;
+OUT_IN vec4 vertex_pos_light_space;
 
 #ifdef VERTEX_SHADER
 
@@ -15,6 +16,7 @@ layout(location = 4) in vec3 input_bitangent;
 uniform mat4 projection_matrix;
 uniform mat4 view_matrix;
 uniform mat4 world_matrix;
+uniform mat4 light_matrix;
 
 void main(void) {
     gl_Position = projection_matrix * view_matrix * world_matrix * vec4(input_position, 1.0);
@@ -23,7 +25,8 @@ void main(void) {
     world_normal   = mat3(transpose(inverse(world_matrix))) * input_normal;
     world_position = (world_matrix * vec4(input_position.xyz, 1.0)).xyz;
     vertex_pos_view_space  = (view_matrix * vec4(world_position, 1.0)).xyz;
-
+    vertex_pos_light_space = light_matrix * vec4(world_position, 1.0);
+    
 #if 0
     vec3 T = normalize(vec3(world_matrix * vec4(input_tangent,   0.0)));
     vec3 B = normalize(vec3(world_matrix * vec4(input_bitangent, 0.0)));
@@ -57,6 +60,7 @@ uniform vec3 camera_position;
 uniform sampler2D diffuse_texture;
 uniform sampler2D specular_texture;
 uniform sampler2D normal_texture;
+uniform sampler2D shadow_map_texture;
 
 struct Directional_Light {
     vec3 direction;
@@ -100,7 +104,7 @@ uniform Point_Light point_lights[MAX_POINT_LIGHTS];
 
 uniform Spot_Light spot_light;
 
-vec3 calculate_directional_light(Directional_Light light, vec3 normal, vec3 view_dir, vec4 diffuse_color, vec4 specular_color) {
+vec3 calculate_directional_light(Directional_Light light, vec3 normal, vec3 view_dir, vec4 diffuse_color, vec4 specular_color, float shadow) {
     if (length(light.diffuse) + length(light.specular) + length(light.ambient) < 1e-6) {
         return vec3(0.0);
     }
@@ -120,7 +124,8 @@ vec3 calculate_directional_light(Directional_Light light, vec3 normal, vec3 view
     vec3 ambient  = light.ambient  * diffuse_color.rgb;
     vec3 diffuse  = light.diffuse  * diff * diffuse_color.rgb;
     vec3 specular = light.specular * spec * specular_color.rgb;
-    return (ambient + diffuse + specular);
+    return (ambient + (1.0 - shadow) * (diffuse + specular));
+    //return (ambient + diffuse + specular);
 }
 
 vec3 calculate_point_light(Point_Light light, vec3 normal, vec3 frag_pos, vec3 view_dir, vec4 diffuse_color, vec4 specular_color) {
@@ -185,6 +190,29 @@ vec3 calculate_spot_light(Spot_Light light, vec3 normal, vec3 frag_pos, vec3 vie
     }
 }
 
+float calculate_shadow(vec4 vertex_pos_light_space) {
+    vec3 proj_coords = vertex_pos_light_space.xyz / vertex_pos_light_space.w;
+    proj_coords = proj_coords * 0.5 + 0.5;
+    float closest_depth = texture(shadow_map_texture, proj_coords.xy).r;
+    float current_depth = proj_coords.z;
+    //float bias = max(0.01 * (1.0 - dot(normalize(world_normal), directional_light.direction)), 0.0001);
+    float bias = 0.001;
+
+    float shadow = 0.0;
+    vec2 texel_size = 1.0 / textureSize(shadow_map_texture, 0);
+    if (proj_coords.z < 1.0) {
+        for (int x = -1; x <= 1; ++x) {
+            for (int y = -1; y <= 1; ++y) {
+                float pcf_depth = texture(shadow_map_texture, proj_coords.xy + vec2(x, y) * texel_size).r;
+                shadow += current_depth - bias > pcf_depth ? 1.0 : 0.0;
+            }
+        }
+    }
+    shadow /= 9.0;
+    
+    return shadow;
+}
+
 void main(void) {
     vec4 diffuse_color  = texture(diffuse_texture, vertex_uv) * material.color;
     vec4 specular_color = texture(specular_texture, vertex_uv);
@@ -199,8 +227,9 @@ void main(void) {
 
         view_dir *= TBN;
     }
-    
-    vec3 accum = calculate_directional_light(directional_light, normal, view_dir, diffuse_color, specular_color);
+
+    float shadow = calculate_shadow(vertex_pos_light_space);
+    vec3 accum = calculate_directional_light(directional_light, normal, view_dir, diffuse_color, specular_color, shadow);
 
     for (int i = 0; i < MAX_POINT_LIGHTS; i++) {
         accum += calculate_point_light(point_lights[i], normal, world_position, view_dir, diffuse_color, specular_color);
