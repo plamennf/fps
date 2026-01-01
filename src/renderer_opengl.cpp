@@ -250,11 +250,11 @@ void set_color_texture(Framebuffer *_framebuffer) {
     glBindTexture(GL_TEXTURE_2D, framebuffer->color_id);
 }
 
-void set_shadow_map(Framebuffer *_framebuffer) {
+void set_shadow_map(Framebuffer *_framebuffer, int index) {
     assert(_framebuffer);
     Framebuffer_Gl *framebuffer = (Framebuffer_Gl *)_framebuffer;
 
-    glActiveTexture(GL_TEXTURE3);
+    glActiveTexture(GL_TEXTURE3 + index);
     glBindTexture(GL_TEXTURE_2D, framebuffer->depth_id);
 }
 
@@ -315,19 +315,22 @@ Framebuffer *make_framebuffer(int width, int height, Texture_Format color_format
     if (depth_format != TEXTURE_FORMAT_UNKNOWN) {
         if (depth_format == TEXTURE_FORMAT_SHADOW_MAP) {
             glBindTexture(GL_TEXTURE_2D, framebuffer->depth_id);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, width, height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-#if 0
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32, width, height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+#if 1
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-#else
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-#endif
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER); 
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
             float border_color[] = { 1.0f, 1.0f, 1.0f, 1.0f };
             glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, border_color);
             glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, framebuffer->depth_id, 0);
+#else
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+#endif
             glDrawBuffer(GL_NONE);
             glReadBuffer(GL_NONE);
         } else {
@@ -605,7 +608,6 @@ Shader *load_shader(char *filepath, Render_Vertex_Type vertex_type) {
     GUL(diffuse_texture);
     GUL(specular_texture);
     GUL(normal_texture);
-    GUL(shadow_map_texture);
     GUL(projection_matrix);
     GUL(view_matrix);
     GUL(world_matrix);
@@ -647,6 +649,18 @@ Shader *load_shader(char *filepath, Render_Vertex_Type vertex_type) {
         shader->point_light_specular[i] = glGetUniformLocation(p, name);
     }
 
+    for (int i = 0; i < NUM_SHADOW_MAP_CASCADES; i++) {
+        char name[128];
+        snprintf(name, sizeof(name), "shadow_map_textures[%d]", i);
+        shader->shadow_map_textures[i] = glGetUniformLocation(p, name);
+
+        snprintf(name, sizeof(name), "light_matrices[%d]", i);
+        shader->light_matrices[i] = glGetUniformLocation(p, name);
+
+        snprintf(name, sizeof(name), "cascade_splits[%d]", i);
+        shader->cascade_splits[i] = glGetUniformLocation(p, name);
+    }
+
     shader->spot_light_position = glGetUniformLocation(p, "spot_light.position");
     shader->spot_light_direction = glGetUniformLocation(p, "spot_light.direction");
     shader->spot_light_cut_off = glGetUniformLocation(p, "spot_light.cut_off");
@@ -662,7 +676,10 @@ Shader *load_shader(char *filepath, Render_Vertex_Type vertex_type) {
     glUniform1i(shader->diffuse_texture, 0);
     glUniform1i(shader->specular_texture, 1);
     glUniform1i(shader->normal_texture, 2);
-    glUniform1i(shader->shadow_map_texture, 3);
+    glUniform1i(shader->shadow_map_textures[0], 3);
+    glUniform1i(shader->shadow_map_textures[1], 4);
+    glUniform1i(shader->shadow_map_textures[2], 5);
+    glUniform1i(shader->shadow_map_textures[3], 6);
     glUseProgram(0);
     
     return (Shader *)shader;
@@ -684,6 +701,7 @@ void set_shader(Shader *_shader) {
 
     refresh_transform();
     refresh_lights();
+    refresh_csm();
 }
 
 Shader *get_current_shader() {
@@ -773,4 +791,15 @@ void refresh_lights() {
     set_float(shader->spot_light_constant, globals.spot_light.constant);
     set_float(shader->spot_light_linear, globals.spot_light.linear);
     set_float(shader->spot_light_quadratic, globals.spot_light.quadratic);
+}
+
+void refresh_csm() {
+    if (!current_shader) return;
+
+    Shader_Gl *shader = (Shader_Gl *)current_shader;
+
+    for (int i = 0; i < NUM_SHADOW_MAP_CASCADES; i++) {
+        set_matrix4(shader->light_matrices[i], globals.shadow_map_cascade_matrices[i]);
+        set_float(shader->cascade_splits[i], globals.shadow_map_cascade_splits[i]);
+    }
 }

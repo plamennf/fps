@@ -151,7 +151,7 @@ Texture *load_texture(char *filepath);
 void destroy_texture(Texture *texture);
 void set_texture(Texture_Type type, Texture *texture);
 void set_color_texture(Framebuffer *framebuffer);
-void set_shadow_map(Framebuffer *framebuffer);
+void set_shadow_map(Framebuffer *framebuffer, int index);
 
 Framebuffer *make_framebuffer(int width, int height, Texture_Format color_format, Texture_Format depth_format);
 void destroy_framebuffer(Framebuffer *framebuffer);
@@ -169,6 +169,7 @@ Shader *get_current_shader();
 void refresh_transform();
 void refresh_material(Material *material);
 void refresh_lights();
+void refresh_csm();
 
 void immediate_begin();
 void immediate_flush();
@@ -178,7 +179,7 @@ void immediate_quad(Vector2 position, Vector2 size, Vector4 color);
 
 void rendering_2d();
 void rendering_3d();
-void rendering_3d_shadow_map();
+void rendering_3d_shadow_map(int cascade_index);
 
 void draw_text(Font *font, char *text, int x, int y, Vector4 color);
 

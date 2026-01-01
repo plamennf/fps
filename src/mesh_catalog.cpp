@@ -20,8 +20,8 @@ Mesh *Mesh_Catalog::find_or_load(char *name) {
             logprintf("No gltf file named '%s' found in '%s'\n", MESH_DIRECTORY);
             return NULL;
         }
-        os_get_file_last_write_time(gltf_full_path, &gltf_full_path_modtime);
     }
+    os_get_file_last_write_time(gltf_full_path, &gltf_full_path_modtime);
     
     char mesh_full_path[4096];
     snprintf(mesh_full_path, sizeof(mesh_full_path), "%s/%s.mesh", MESH_DIRECTORY, name);

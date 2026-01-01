@@ -12,6 +12,7 @@
 
 const int SHADOW_MAP_WIDTH  = 4096;
 const int SHADOW_MAP_HEIGHT = 4096;
+const int NUM_SHADOW_MAP_CASCADES = 4;      
 
 const float CAMERA_FOV = 90.0f;
 const float CAMERA_Z_NEAR = 0.1f;
@@ -51,8 +52,8 @@ struct Global_Variables {
 
     Time_Info time_info = {};
 
-    //float mouse_sensitivity = 0.1f; // @PC
-    float mouse_sensitivity = 0.2f; // @Laptop
+    float mouse_sensitivity = 0.1f; // @PC
+    //float mouse_sensitivity = 0.2f; // @Laptop
     
     float mouse_x_delta = 0;
     float mouse_y_delta = 0;
@@ -69,7 +70,9 @@ struct Global_Variables {
     Texture *black_texture = NULL;
 
     Framebuffer *offscreen_buffer = NULL;
-    Framebuffer *shadow_map_buffer = NULL;
+    Framebuffer *shadow_map_cascade_buffers[NUM_SHADOW_MAP_CASCADES] = {};
+    Matrix4 shadow_map_cascade_matrices[NUM_SHADOW_MAP_CASCADES] = {};
+    float shadow_map_cascade_splits[NUM_SHADOW_MAP_CASCADES] = { 30.0f, 100.0f, 200.0f, 400.0f };
     
     Shader *shader_color = NULL;
     Shader *shader_texture = NULL;

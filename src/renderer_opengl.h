@@ -25,7 +25,7 @@ struct Shader_Gl : public Shader {
     GLint diffuse_texture;
     GLint specular_texture;
     GLint normal_texture;
-    GLint shadow_map_texture;
+    GLint shadow_map_textures[NUM_SHADOW_MAP_CASCADES];
 
     GLint projection_matrix;
     GLint view_matrix;
@@ -37,6 +37,9 @@ struct Shader_Gl : public Shader {
     GLint material_use_normal_map;
     
     GLint camera_position;
+
+    GLint light_matrices[NUM_SHADOW_MAP_CASCADES];
+    GLint cascade_splits[NUM_SHADOW_MAP_CASCADES];
     
     GLint directional_light_direction;
     GLint directional_light_ambient;

@@ -7,6 +7,8 @@
 #include <SDL3/SDL_main.h>
 #include <GL/glew.h>
 #include <stdio.h>
+#include <float.h>
+#include <limits.h>
 
 Global_Variables globals = {};
 
@@ -25,11 +27,89 @@ static void init_framebuffers() {
         globals.offscreen_buffer = NULL;
     }
 
-    if (!globals.shadow_map_buffer) {
-        globals.shadow_map_buffer = make_framebuffer(SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT, TEXTURE_FORMAT_UNKNOWN, TEXTURE_FORMAT_SHADOW_MAP);
+    for (int i = 0; i < NUM_SHADOW_MAP_CASCADES; i++) {    
+        if (!globals.shadow_map_cascade_buffers[i]) {
+            globals.shadow_map_cascade_buffers[i] = make_framebuffer(SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT, TEXTURE_FORMAT_UNKNOWN, TEXTURE_FORMAT_SHADOW_MAP);
+        }
     }
     
     globals.offscreen_buffer = make_framebuffer(globals.window_width, globals.window_height, TEXTURE_FORMAT_RGBA8, TEXTURE_FORMAT_D24S8);
+}
+
+static void update_shadow_map_cascade_matrices() {
+#if 1
+    for (int i = 0; i < NUM_SHADOW_MAP_CASCADES; i++) {
+        float prev_split = (i == 0) ? CAMERA_Z_NEAR : globals.shadow_map_cascade_splits[i - 1];
+        float curr_split = globals.shadow_map_cascade_splits[i];
+
+        Vector3 camera_position = globals.camera.position;
+        Vector3 light_direction = normalize_or_zero(globals.directional_light.direction);
+
+        float s = curr_split;
+        Matrix4 light_proj = make_orthographic(-s, s, -s, s, 0.1f, 1000.0f);
+
+        Vector3 light_eye = camera_position - (light_direction * 500.0f);
+        //Vector3 light_eye = light_direction * -500.0f;
+
+        Vector3 world_up = (fabsf(light_direction.y) > 0.99f) ? v3(0, 0, 1) : v3(0, 1, 0);
+
+        Matrix4 light_view = make_look_at_matrix(light_eye, camera_position, v3(0, 1, 0));
+        globals.shadow_map_cascade_matrices[i] = light_proj * light_view;
+    }
+#else
+    Matrix4 view_matrix = get_view_matrix(&globals.camera);
+    Matrix4 inv_view_matrix = inverse(view_matrix);
+
+    Matrix4 light_matrix = make_look_at_matrix(v3(0, 0, 0), globals.directional_light.direction, v3(0, 1, 0));
+
+    float ar = (float)globals.window_height / (float)globals.window_width;
+    float tan_half_hfov = tanf(to_radians(CAMERA_FOV * 0.5f));
+    float tan_half_vfov = tanf(to_radians((CAMERA_FOV * ar) * 0.5f));
+
+    for (int i = 0; i < NUM_SHADOW_MAP_CASCADES - 1; i++) {
+        float xn = globals.shadow_map_cascade_splits[i] * tan_half_hfov;
+        float xf = globals.shadow_map_cascade_splits[i + 1] * tan_half_hfov;
+        float yn = globals.shadow_map_cascade_splits[i] * tan_half_vfov;
+        float yf = globals.shadow_map_cascade_splits[i + 1] * tan_half_vfov;
+
+        Vector4 frustum_corners[8] = {
+            v4(xn, yn, globals.shadow_map_cascade_splits[i], 1.0f),
+            v4(-xn, yn, globals.shadow_map_cascade_splits[i], 1.0f),
+            v4(xn, -yn, globals.shadow_map_cascade_splits[i], 1.0f),
+            v4(-xn, -yn, globals.shadow_map_cascade_splits[i], 1.0f),
+
+            v4(xf, yf, globals.shadow_map_cascade_splits[i + 1], 1.0f),
+            v4(-xf, yf, globals.shadow_map_cascade_splits[i + 1], 1.0f),
+            v4(xf, -yf, globals.shadow_map_cascade_splits[i + 1], 1.0f),
+            v4(-xf, -yf, globals.shadow_map_cascade_splits[i + 1], 1.0f),
+        };
+
+        Vector4 frustum_corners_l[8];
+
+        float min_x = +FLT_MAX;
+        float max_x = -FLT_MAX;
+        float min_y = +FLT_MAX;
+        float max_y = -FLT_MAX;
+        float min_z = +FLT_MAX;
+        float max_z = -FLT_MAX;
+
+        for (int j = 0; j < 8; j++) {
+            Vector4 vw = inv_view_matrix * frustum_corners[j];
+            frustum_corners_l[j] = light_matrix * vw;
+
+            min_x = Min(min_x, frustum_corners_l[j].x);
+            max_x = Max(max_x, frustum_corners_l[j].x);
+            min_y = Min(min_y, frustum_corners_l[j].y);
+            max_y = Max(max_y, frustum_corners_l[j].y);
+            min_z = Min(min_z, frustum_corners_l[j].z);
+            max_z = Max(max_z, frustum_corners_l[j].z);
+        }
+
+        globals.shadow_map_cascade_matrices[i] = make_orthographic(min_x, max_x, min_y, max_y, min_z, max_z);
+    }
+#endif
+    
+    refresh_csm();
 }
 
 static void init_shaders() {
@@ -110,9 +190,12 @@ static void draw_one_frame() {
 
     // Shadows Drawing:
     globals.render_stage = RENDER_STAGE_SHADOW;
-    set_framebuffer(globals.shadow_map_buffer, false, v4(0, 0, 0, 0), true, 1.0f, false, 0);
-    rendering_3d_shadow_map();
-    draw_scene();
+    update_shadow_map_cascade_matrices();
+    for (int i = 0; i < NUM_SHADOW_MAP_CASCADES; i++) {
+        set_framebuffer(globals.shadow_map_cascade_buffers[i], false, v4(0, 0, 0, 0), true, 1.0f, false, 0);
+        rendering_3d_shadow_map(i);
+        draw_scene();
+    }
     
     // Normal 3D Drawing:
     globals.render_stage = RENDER_STAGE_MAIN;
@@ -221,7 +304,7 @@ int main(int argc, char *argv[]) {
     u8 black_texture_data[4] = { 0x00, 0x00, 0x00, 0xFF };
     globals.black_texture = make_texture(1, 1, TEXTURE_FORMAT_RGBA8, black_texture_data);
     
-    globals.mesh = globals.mesh_catalog->find_or_load("Yeti");
+    globals.mesh = globals.mesh_catalog->find_or_load("Demon");
     if (!globals.mesh) return 1;
     //if (!load_mesh(globals.mesh, "data/meshes/Yeti.gltf")) return 1;
     //if (!load_mesh(globals.mesh, "data/meshes/knight.gltf")) return 1;
