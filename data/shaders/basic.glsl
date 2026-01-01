@@ -195,31 +195,6 @@ vec3 calculate_spot_light(Spot_Light light, vec3 normal, vec3 frag_pos, vec3 vie
     }
 }
 
-#if 0
-float calculate_shadow(vec4 vertex_pos_light_space) {
-    vec3 proj_coords = vertex_pos_light_space.xyz / vertex_pos_light_space.w;
-    proj_coords = proj_coords * 0.5 + 0.5;
-    float closest_depth = texture(shadow_map_texture, proj_coords.xy).r;
-    float current_depth = proj_coords.z;
-    //float bias = max(0.01 * (1.0 - dot(normalize(world_normal), directional_light.direction)), 0.001);
-    float bias = 0.0001;
-
-    float shadow = 0.0;
-    vec2 texel_size = 1.0 / textureSize(shadow_map_texture, 0);
-    if (proj_coords.z < 1.0) {
-        for (int x = -2; x <= 2; ++x) {
-            for (int y = -2; y <= 2; ++y) {
-                float pcf_depth = texture(shadow_map_texture, proj_coords.xy + vec2(x, y) * texel_size).r;
-                shadow += current_depth - bias > pcf_depth ? 1.0 : 0.0;
-            }
-        }
-    }
-    shadow /= 25.0;
-    
-    return shadow;
-}
-#else
-
 int calculate_csm() {
     float depth = length(world_position - camera_position);
     
@@ -232,7 +207,6 @@ int calculate_csm() {
 }
 
 float calculate_shadow_per_cascade(vec4 vertex_pos_light_space, int index) {
-#if 1
     vec3 proj_coords = vertex_pos_light_space.xyz / vertex_pos_light_space.w;
     proj_coords = proj_coords * 0.5 + 0.5;
 
@@ -257,21 +231,6 @@ float calculate_shadow_per_cascade(vec4 vertex_pos_light_space, int index) {
     shadow /= 25.0;
     
     return shadow;
-#else
-
-    vec3 proj_coords = vertex_pos_light_space.xyz / vertex_pos_light_space.w;
-
-    vec2 uv_coords;
-    uv_coords.x = 0.5 * proj_coords.x + 0.5;
-    uv_coords.y = 0.5 * proj_coords.y + 0.5;
-
-    float z = 0.5 * proj_coords.z + 0.5;
-    float depth = texture(shadow_map_textures[index], uv_coords).x;
-
-    if (depth < z + 0.00001)
-        return 0.5;
-    return 1.0;
-#endif
 }
 
 float calculate_shadow() {
@@ -283,8 +242,6 @@ float calculate_shadow() {
     if (index == 2) return calculate_shadow_per_cascade(vertex_pos_light_space, 2);
     return calculate_shadow_per_cascade(vertex_pos_light_space, 3);
 }
-
-#endif
 
 void main(void) {
     vec4 diffuse_color  = texture(diffuse_texture, vertex_uv) * material.color;

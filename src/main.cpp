@@ -37,7 +37,6 @@ static void init_framebuffers() {
 }
 
 static void update_shadow_map_cascade_matrices() {
-#if 1
     for (int i = 0; i < NUM_SHADOW_MAP_CASCADES; i++) {
         float prev_split = (i == 0) ? CAMERA_Z_NEAR : globals.shadow_map_cascade_splits[i - 1];
         float curr_split = globals.shadow_map_cascade_splits[i];
@@ -56,58 +55,6 @@ static void update_shadow_map_cascade_matrices() {
         Matrix4 light_view = make_look_at_matrix(light_eye, camera_position, v3(0, 1, 0));
         globals.shadow_map_cascade_matrices[i] = light_proj * light_view;
     }
-#else
-    Matrix4 view_matrix = get_view_matrix(&globals.camera);
-    Matrix4 inv_view_matrix = inverse(view_matrix);
-
-    Matrix4 light_matrix = make_look_at_matrix(v3(0, 0, 0), globals.directional_light.direction, v3(0, 1, 0));
-
-    float ar = (float)globals.window_height / (float)globals.window_width;
-    float tan_half_hfov = tanf(to_radians(CAMERA_FOV * 0.5f));
-    float tan_half_vfov = tanf(to_radians((CAMERA_FOV * ar) * 0.5f));
-
-    for (int i = 0; i < NUM_SHADOW_MAP_CASCADES - 1; i++) {
-        float xn = globals.shadow_map_cascade_splits[i] * tan_half_hfov;
-        float xf = globals.shadow_map_cascade_splits[i + 1] * tan_half_hfov;
-        float yn = globals.shadow_map_cascade_splits[i] * tan_half_vfov;
-        float yf = globals.shadow_map_cascade_splits[i + 1] * tan_half_vfov;
-
-        Vector4 frustum_corners[8] = {
-            v4(xn, yn, globals.shadow_map_cascade_splits[i], 1.0f),
-            v4(-xn, yn, globals.shadow_map_cascade_splits[i], 1.0f),
-            v4(xn, -yn, globals.shadow_map_cascade_splits[i], 1.0f),
-            v4(-xn, -yn, globals.shadow_map_cascade_splits[i], 1.0f),
-
-            v4(xf, yf, globals.shadow_map_cascade_splits[i + 1], 1.0f),
-            v4(-xf, yf, globals.shadow_map_cascade_splits[i + 1], 1.0f),
-            v4(xf, -yf, globals.shadow_map_cascade_splits[i + 1], 1.0f),
-            v4(-xf, -yf, globals.shadow_map_cascade_splits[i + 1], 1.0f),
-        };
-
-        Vector4 frustum_corners_l[8];
-
-        float min_x = +FLT_MAX;
-        float max_x = -FLT_MAX;
-        float min_y = +FLT_MAX;
-        float max_y = -FLT_MAX;
-        float min_z = +FLT_MAX;
-        float max_z = -FLT_MAX;
-
-        for (int j = 0; j < 8; j++) {
-            Vector4 vw = inv_view_matrix * frustum_corners[j];
-            frustum_corners_l[j] = light_matrix * vw;
-
-            min_x = Min(min_x, frustum_corners_l[j].x);
-            max_x = Max(max_x, frustum_corners_l[j].x);
-            min_y = Min(min_y, frustum_corners_l[j].y);
-            max_y = Max(max_y, frustum_corners_l[j].y);
-            min_z = Min(min_z, frustum_corners_l[j].z);
-            max_z = Max(max_z, frustum_corners_l[j].z);
-        }
-
-        globals.shadow_map_cascade_matrices[i] = make_orthographic(min_x, max_x, min_y, max_y, min_z, max_z);
-    }
-#endif
     
     refresh_csm();
 }
