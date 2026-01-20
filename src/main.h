@@ -68,7 +68,8 @@ struct Global_Variables {
     
     Texture *white_texture = NULL;
     Texture *black_texture = NULL;
-
+    Texture *skybox = NULL;
+    
     Framebuffer *offscreen_buffer = NULL;
     Framebuffer *shadow_map_cascade_buffers[NUM_SHADOW_MAP_CASCADES] = {};
     Matrix4 shadow_map_cascade_matrices[NUM_SHADOW_MAP_CASCADES] = {};
@@ -81,6 +82,7 @@ struct Global_Variables {
     Shader *shader_depth_debug = NULL;
     Shader *shader_resolve = NULL;
     Shader *shader_resolve_msaa = NULL;
+    Shader *shader_skybox = NULL;
 
     Mesh *mesh = NULL;
     
@@ -88,7 +90,7 @@ struct Global_Variables {
     Directional_Light directional_light = {};
     Point_Light point_lights[MAX_POINT_LIGHTS] = {};
     Spot_Light spot_light = {};
-
+    
     Render_Stage render_stage = RENDER_STAGE_MAIN;
 
     Mesh_Catalog *mesh_catalog = NULL;

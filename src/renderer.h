@@ -148,10 +148,12 @@ void draw_non_indexed(u32 num_vertices, u32 first_vertex);
 
 Texture *make_texture(int width, int height, Texture_Format format, u8 *data, char *filepath = NULL);
 Texture *load_texture(char *filepath);
+Texture *load_cubemap(char *filepaths_of_faces[6]);
 void destroy_texture(Texture *texture);
 void set_texture(Texture_Type type, Texture *texture);
 void set_color_texture(Framebuffer *framebuffer);
 void set_shadow_map(Framebuffer *framebuffer, int index);
+void set_cube_map(Texture *texture);
 
 Framebuffer *make_framebuffer(int width, int height, Texture_Format color_format, Texture_Format depth_format);
 void destroy_framebuffer(Framebuffer *framebuffer);

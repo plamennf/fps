@@ -272,10 +272,12 @@ void draw_mesh(Mesh *mesh, Vector3 position, Vector3 rotation, float scale) {
 }
 
 void draw_cube(Vector3 position, Vector3 rotation, Vector3 scale, Vector4 color) {
-    if (globals.render_stage == RENDER_STAGE_MAIN) {
-        set_shader(globals.shader_basic);
-    } else {
-        set_shader(globals.shader_depth);
+    if (get_current_shader() != globals.shader_skybox) {
+        if (globals.render_stage == RENDER_STAGE_MAIN) {
+            set_shader(globals.shader_basic);
+        } else {
+            set_shader(globals.shader_depth);
+        }
     }
 
     globals.transform.world_matrix = make_transformation_matrix(position, rotation, scale);

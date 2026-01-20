@@ -1,4 +1,16 @@
 - Add shadows.
+
+- Add skybox.
+- Add noclip camera movement style.
+- Add console.
+- Add noclip command.
+- Add editor mode where the camera is noclip by default.
+- Add ability to pick objects and display their properties.
+- Add ability to move/rotate/scale objects.
+- Add ability to show hitboxes.
+- Add ability to add hitboxes.
+- Add ability to scale and move hitboxes. - no rotation
+
 - Add PBR.
 - Add multithreaded asset loading.
 - Add menu.

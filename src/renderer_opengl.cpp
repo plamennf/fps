@@ -218,6 +218,43 @@ Texture *load_texture(char *filepath) {
     return make_texture(width, height, format, data, filepath);
 }
 
+Texture *load_cubemap(char *filepaths_of_faces[6]) {
+    GLuint texture_id;
+    glGenTextures(1, &texture_id);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, texture_id);
+
+    int width, height, channels;
+    stbi_set_flip_vertically_on_load(0);
+    for (int i = 0; i < 6; i++) {
+        stbi_uc *data = stbi_load(filepaths_of_faces[i], &width, &height, &channels, 4);
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_SRGB8_ALPHA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+        if (data) {
+            stbi_image_free(data);
+            data = NULL;
+        } else {
+            logprintf("Failed to load '%s' cubemap texture!\n", filepaths_of_faces[i]);
+            return NULL;
+        }
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+
+    Texture_Gl *texture = add_texture();
+
+    texture->width    = width;
+    texture->height   = height;
+    //texture->format   = format;
+    //texture->bpp      = get_bpp(format);
+    //texture->filepath = copy_string(filepath);
+    texture->id       = texture_id;
+    
+    return (Texture *)texture;
+}
+
 void destroy_texture(Texture *_texture) {
     if (!_texture) return;
     
@@ -256,6 +293,14 @@ void set_shadow_map(Framebuffer *_framebuffer, int index) {
 
     glActiveTexture(GL_TEXTURE3 + index);
     glBindTexture(GL_TEXTURE_2D, framebuffer->depth_id);
+}
+
+void set_cube_map(Texture *_texture) {
+    assert(_texture);
+    Texture_Gl *texture = (Texture_Gl *)_texture;
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, texture->id);
 }
 
 Framebuffer *make_framebuffer(int width, int height, Texture_Format color_format, Texture_Format depth_format) {
