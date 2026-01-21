@@ -1,7 +1,3 @@
-- Add shadows.
-
-- Add skybox.
-- Add noclip camera movement style.
 - Add console.
 - Add noclip command.
 - Add editor mode where the camera is noclip by default.
@@ -14,3 +10,5 @@
 - Add PBR.
 - Add multithreaded asset loading.
 - Add menu.
+- Add fxaa.
+- Fix msaa support.

@@ -110,6 +110,13 @@ static void draw_hud() {
     int x = globals.render_target_width  - get_text_width(font, text);
     int y = globals.render_target_height - font->character_height;
     draw_text(font, text, x, y, v4(1, 1, 1, 1));
+
+    if (globals.camera_type == CAMERA_TYPE_NOCLIP) {
+        y -= font->character_height;
+        snprintf(text, sizeof(text), "Noclip Enabled");
+        x = globals.render_target_width - get_text_width(font, text);
+        draw_text(font, text, x, y, v4(1, 1, 1, 1));
+    }
 }
 
 static void resolve_to_screen() {
@@ -171,6 +178,14 @@ static void draw_one_frame() {
 static void toggle_fullscreen() {
     globals.is_fullscreen = !globals.is_fullscreen;
     SDL_SetWindowFullscreen(globals.window, globals.is_fullscreen);
+}
+
+static void toggle_noclip() {
+    if (globals.camera_type == CAMERA_TYPE_FPS) {
+        globals.camera_type = CAMERA_TYPE_NOCLIP;
+    } else {
+        globals.camera_type = CAMERA_TYPE_FPS;
+    }
 }
 
 static void update_time() {
@@ -348,6 +363,10 @@ int main(int argc, char *argv[]) {
             toggle_fullscreen();
         }
 
+        if (is_key_pressed(SDL_SCANCODE_N)) {
+            toggle_noclip();
+        }
+
         if (globals.should_show_cursor) {
             SDL_SetWindowRelativeMouseMode(globals.window, false);
         } else {
@@ -355,7 +374,7 @@ int main(int argc, char *argv[]) {
         }
 
         if (!globals.should_show_cursor) {
-            update_camera(&globals.camera);
+            update_camera(&globals.camera, globals.camera_type);
 
             if (is_mouse_button_pressed(SDL_BUTTON_RIGHT)) {
                 globals.flashlight_on = !globals.flashlight_on;

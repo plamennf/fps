@@ -11,7 +11,7 @@ void init_camera(Camera *camera, Vector3 position, float pitch, float yaw, float
     camera->is_on_ground = true;
 }
 
-void update_camera(Camera *camera) {
+void update_camera_fps(Camera *camera) {
     float sensitivity = globals.mouse_sensitivity;
     float dt = globals.time_info.dt;
     
@@ -76,6 +76,65 @@ void update_camera(Camera *camera) {
     if (camera->position.y < 2.0f) {
         camera->position.y = 2.0f;
         camera->is_on_ground = true;
+    }
+}
+
+void update_camera_noclip(Camera *camera) {
+    float sensitivity = globals.mouse_sensitivity;
+    float dt = globals.time_info.dt;
+    
+    camera->yaw   += globals.mouse_x_delta * sensitivity;
+    camera->pitch += globals.mouse_y_delta * sensitivity;
+
+    if (camera->pitch > 89.0f) {
+        camera->pitch = 89.0f;
+    } else if (camera->pitch < -89.0f) {
+        camera->pitch = -89.0f;
+    }
+
+    float movement_speed = 5.0f;
+    if (is_key_down(SDL_SCANCODE_LSHIFT)) {
+        movement_speed *= 3.0f;
+    }
+
+    Vector3 world_up = v3(0, 1, 0);
+    Vector3 right = normalize_or_zero(cross_product(camera->target, world_up));
+    Vector3 up = normalize_or_zero(cross_product(right, camera->target));
+
+    camera->target = v3(0, 0, 0);
+    camera->target.x = cosf(to_radians(camera->yaw)) * cosf(to_radians(camera->pitch));
+    camera->target.y = sinf(to_radians(camera->pitch));
+    camera->target.z = sinf(to_radians(camera->yaw)) * cosf(to_radians(camera->pitch));
+    Vector3 camera_target = normalize_or_zero(camera->target);
+
+    if (is_key_down(SDL_SCANCODE_W)) {
+        camera->position += camera_target * movement_speed * dt;
+    }
+
+    if (is_key_down(SDL_SCANCODE_S)) {
+        camera->position -= camera_target * movement_speed * dt;
+    }
+
+    if (is_key_down(SDL_SCANCODE_A)) {
+        camera->position -= right * movement_speed * dt;
+    }
+
+    if (is_key_down(SDL_SCANCODE_D)) {
+        camera->position += right * movement_speed * dt;
+    }
+
+    camera->target = camera_target;
+}
+
+void update_camera(Camera *camera, Camera_Type type) {
+    switch (type) {
+        case CAMERA_TYPE_FPS: {
+            update_camera_fps(camera);
+        } break;
+
+        case CAMERA_TYPE_NOCLIP: {
+            update_camera_noclip(camera);
+        } break;
     }
 }
 

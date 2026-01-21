@@ -65,6 +65,7 @@ struct Global_Variables {
     int render_target_height = 0;
     
     Camera camera = {};
+    Camera_Type camera_type = CAMERA_TYPE_FPS;
     
     Texture *white_texture = NULL;
     Texture *black_texture = NULL;
