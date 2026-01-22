@@ -284,7 +284,13 @@ void set_color_texture(Framebuffer *_framebuffer) {
     Framebuffer_Gl *framebuffer = (Framebuffer_Gl *)_framebuffer;
 
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, framebuffer->color_id);
+    if (globals.antialiasing_type == ANTIALIASING_MSAA_8X ||
+        globals.antialiasing_type == ANTIALIASING_MSAA_4X ||
+        globals.antialiasing_type == ANTIALIASING_MSAA_2X) {
+        glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, framebuffer->color_id);
+    } else {
+        glBindTexture(GL_TEXTURE_2D, framebuffer->color_id);
+    }
 }
 
 void set_shadow_map(Framebuffer *_framebuffer, int index) {
@@ -375,6 +381,58 @@ Framebuffer *make_framebuffer(int width, int height, Texture_Format color_format
             glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height);
             glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, framebuffer->depth_id);
         }
+    }
+
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        logprintf("Framebuffer(%dx%d) is not complete!!!\n", width, height);
+        assert(!"Incomplete framebuffer");
+    }
+
+    return (Framebuffer *)framebuffer;
+}
+
+Framebuffer *make_multisampled_framebuffer(int width, int height, Texture_Format color_format, Texture_Format depth_format, int num_multisamples) {
+    assert(color_format != TEXTURE_FORMAT_UNKNOWN || depth_format != TEXTURE_FORMAT_UNKNOWN);
+    assert(color_format == TEXTURE_FORMAT_RGBA8 || color_format == TEXTURE_FORMAT_UNKNOWN);
+    assert(depth_format == TEXTURE_FORMAT_D24S8 || depth_format == TEXTURE_FORMAT_UNKNOWN);
+
+    Framebuffer_Gl *framebuffer = add_framebuffer();
+
+    framebuffer->width  = width;
+    framebuffer->height = height;
+
+    framebuffer->color_format = color_format;
+    framebuffer->depth_format = depth_format;
+    
+    glGenFramebuffers(1, &framebuffer->fbo_id);
+    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer->fbo_id);
+
+    if (color_format != TEXTURE_FORMAT_UNKNOWN) {
+        glGenTextures(1, &framebuffer->color_id);
+    }
+
+    if (depth_format != TEXTURE_FORMAT_UNKNOWN) {
+        if (depth_format == TEXTURE_FORMAT_SHADOW_MAP) {
+            glGenTextures(1, &framebuffer->depth_id);
+        } else {
+            glGenRenderbuffers(1, &framebuffer->depth_id);
+        }
+    }
+
+    if (color_format != TEXTURE_FORMAT_UNKNOWN) {
+        glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, framebuffer->color_id);
+        glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, num_multisamples, GL_SRGB8_ALPHA8, width, height, GL_TRUE);
+        glTexParameteri(GL_TEXTURE_2D_MULTISAMPLE, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D_MULTISAMPLE, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D_MULTISAMPLE, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D_MULTISAMPLE, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D_MULTISAMPLE, framebuffer->color_id, 0);
+    }
+
+    if (depth_format != TEXTURE_FORMAT_UNKNOWN) {
+        glBindRenderbuffer(GL_RENDERBUFFER, framebuffer->depth_id);
+        glRenderbufferStorageMultisample(GL_RENDERBUFFER, num_multisamples, GL_DEPTH24_STENCIL8, width, height);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, framebuffer->depth_id);
     }
 
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
@@ -738,6 +796,11 @@ void set_shader(Shader *_shader) {
     refresh_transform();
     refresh_lights();
     refresh_csm();
+
+    if (shader->num_multisamples != -1) {
+        int get_num_multisamples(Antialiasing_Type type);
+        glUniform1i(shader->num_multisamples, get_num_multisamples(globals.antialiasing_type));
+    }
 }
 
 Shader *get_current_shader() {

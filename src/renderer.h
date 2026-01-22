@@ -156,6 +156,7 @@ void set_shadow_map(Framebuffer *framebuffer, int index);
 void set_cube_map(Texture *texture);
 
 Framebuffer *make_framebuffer(int width, int height, Texture_Format color_format, Texture_Format depth_format);
+Framebuffer *make_multisampled_framebuffer(int width, int height, Texture_Format color_format, Texture_Format depth_format, int num_multisamples);
 void destroy_framebuffer(Framebuffer *framebuffer);
 void set_framebuffer(Framebuffer *framebuffer, bool clear_color, Vector4 color, bool clear_depth, float z, bool clear_stencil, u8 stencil);
 

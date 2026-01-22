@@ -25,6 +25,9 @@ struct Mesh_Catalog;
 enum Antialiasing_Type {
     ANTIALIASING_NONE,
     ANTIALIASING_FXAA,
+    ANTIALIASING_MSAA_2X,
+    ANTIALIASING_MSAA_4X,
+    ANTIALIASING_MSAA_8X,
 };
 
 enum Render_Stage {
@@ -69,7 +72,7 @@ struct Global_Variables {
     int render_target_width  = 0;
     int render_target_height = 0;
 
-    Antialiasing_Type antialiasing_type = ANTIALIASING_NONE;
+    Antialiasing_Type antialiasing_type = ANTIALIASING_MSAA_8X;
     
     Camera camera = {};
     Camera_Type camera_type = CAMERA_TYPE_FPS;

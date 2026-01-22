@@ -21,6 +21,16 @@ struct Key_State {
 static Key_State key_states[SDL_SCANCODE_COUNT];
 static Key_State mouse_buttons[6];
 
+int get_num_multisamples(Antialiasing_Type type) {
+    switch (type) {
+        case ANTIALIASING_MSAA_8X: return 8;
+        case ANTIALIASING_MSAA_4X: return 4;
+        case ANTIALIASING_MSAA_2X: return 2;
+    }
+
+    return 0;
+}
+
 static void init_framebuffers() {    
     if (globals.offscreen_buffer) {
         destroy_framebuffer(globals.offscreen_buffer);
@@ -32,8 +42,14 @@ static void init_framebuffers() {
             globals.shadow_map_cascade_buffers[i] = make_framebuffer(SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT, TEXTURE_FORMAT_UNKNOWN, TEXTURE_FORMAT_SHADOW_MAP);
         }
     }
-    
-    globals.offscreen_buffer = make_framebuffer(globals.window_width, globals.window_height, TEXTURE_FORMAT_RGBA8, TEXTURE_FORMAT_D24S8);
+
+    if (globals.antialiasing_type == ANTIALIASING_MSAA_2X ||
+        globals.antialiasing_type == ANTIALIASING_MSAA_4X ||
+        globals.antialiasing_type == ANTIALIASING_MSAA_8X) {
+        globals.offscreen_buffer = make_multisampled_framebuffer(globals.window_width, globals.window_height, TEXTURE_FORMAT_RGBA8, TEXTURE_FORMAT_D24S8, get_num_multisamples(globals.antialiasing_type));
+    } else {
+        globals.offscreen_buffer = make_framebuffer(globals.window_width, globals.window_height, TEXTURE_FORMAT_RGBA8, TEXTURE_FORMAT_D24S8);
+    }
 }
 
 static void update_shadow_map_cascade_matrices() {
@@ -124,6 +140,12 @@ static void draw_hud() {
 
         if (globals.antialiasing_type == ANTIALIASING_FXAA) {
             snprintf(text, sizeof(text), "FXAA Enabled");
+        } else if (globals.antialiasing_type == ANTIALIASING_MSAA_2X) {
+            snprintf(text, sizeof(text), "MSAA 2X Enabled");
+        } else if (globals.antialiasing_type == ANTIALIASING_MSAA_4X) {
+            snprintf(text, sizeof(text), "MSAA 4X Enabled");
+        } else if (globals.antialiasing_type == ANTIALIASING_MSAA_8X) {
+            snprintf(text, sizeof(text), "MSAA 8X Enabled");
         }
         
         x = globals.render_target_width - get_text_width(font, text);
@@ -135,11 +157,19 @@ static void resolve_to_screen(bool clear_back_buffer = true) {
     set_framebuffer(NULL, clear_back_buffer, v4(0, 0, 0, 1), false, 1.0f, false, 0);
     rendering_2d();
 
-    if (clear_back_buffer && globals.antialiasing_type == ANTIALIASING_FXAA) {
-        set_shader(globals.shader_fxaa);
+    if (globals.antialiasing_type == ANTIALIASING_MSAA_8X ||
+        globals.antialiasing_type == ANTIALIASING_MSAA_4X ||
+        globals.antialiasing_type == ANTIALIASING_MSAA_2X) {
+        set_shader(globals.shader_resolve_msaa);
     } else {
-        set_shader(globals.shader_texture);
+        if (clear_back_buffer && globals.antialiasing_type == ANTIALIASING_FXAA) {
+            set_shader(globals.shader_fxaa);
+        }
+        else {
+            set_shader(globals.shader_texture);
+        }
     }
+    
     set_color_texture(globals.offscreen_buffer);
     
     immediate_begin();
@@ -383,14 +413,6 @@ int main(int argc, char *argv[]) {
 
         if (is_key_pressed(SDL_SCANCODE_N)) {
             toggle_noclip();
-        }
-
-        if (is_key_pressed(SDL_SCANCODE_M)) {
-            if (globals.antialiasing_type == ANTIALIASING_NONE) {
-                globals.antialiasing_type = ANTIALIASING_FXAA;
-            } else if (globals.antialiasing_type == ANTIALIASING_FXAA) {
-                globals.antialiasing_type = ANTIALIASING_NONE;
-            }
         }
         
         if (globals.should_show_cursor) {
