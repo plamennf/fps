@@ -68,6 +68,7 @@ static void init_shaders() {
     globals.shader_resolve      = load_shader("data/shaders/resolve.glsl", RENDER_VERTEX_IMMEDIATE);
     globals.shader_resolve_msaa = load_shader("data/shaders/resolve_msaa.glsl", RENDER_VERTEX_IMMEDIATE);
     globals.shader_skybox       = load_shader("data/shaders/skybox.glsl", RENDER_VERTEX_MESH);
+    globals.shader_fxaa         = load_shader("data/shaders/fxaa.glsl", RENDER_VERTEX_IMMEDIATE);
 }
 
 static void init_lights() {
@@ -117,13 +118,28 @@ static void draw_hud() {
         x = globals.render_target_width - get_text_width(font, text);
         draw_text(font, text, x, y, v4(1, 1, 1, 1));
     }
+
+    if (globals.antialiasing_type != ANTIALIASING_NONE) {
+        y -= font->character_height;
+
+        if (globals.antialiasing_type == ANTIALIASING_FXAA) {
+            snprintf(text, sizeof(text), "FXAA Enabled");
+        }
+        
+        x = globals.render_target_width - get_text_width(font, text);
+        draw_text(font, text, x, y, v4(1, 1, 1, 1));
+    }
 }
 
-static void resolve_to_screen() {
-    set_framebuffer(NULL, true, v4(0, 0, 0, 1), false, 1.0f, false, 0);
+static void resolve_to_screen(bool clear_back_buffer = true) {
+    set_framebuffer(NULL, clear_back_buffer, v4(0, 0, 0, 1), false, 1.0f, false, 0);
     rendering_2d();
 
-    set_shader(globals.shader_texture);
+    if (clear_back_buffer && globals.antialiasing_type == ANTIALIASING_FXAA) {
+        set_shader(globals.shader_fxaa);
+    } else {
+        set_shader(globals.shader_texture);
+    }
     set_color_texture(globals.offscreen_buffer);
     
     immediate_begin();
@@ -157,7 +173,9 @@ static void draw_one_frame() {
     globals.render_stage = RENDER_STAGE_MAIN;
     rendering_3d();
     draw_scene();
+    resolve_to_screen();
 
+    set_framebuffer(globals.offscreen_buffer, false, v4(0, 0, 0, 1), false, 1.0f, false, 0);
     // Skybox Drawing:
     rendering_3d();
     set_depth_write(false);
@@ -172,7 +190,7 @@ static void draw_one_frame() {
     set_cull_face(CULL_FACE_NONE);
     draw_hud();
     
-    resolve_to_screen();
+    resolve_to_screen(false);
 }
 
 static void toggle_fullscreen() {
@@ -367,6 +385,14 @@ int main(int argc, char *argv[]) {
             toggle_noclip();
         }
 
+        if (is_key_pressed(SDL_SCANCODE_M)) {
+            if (globals.antialiasing_type == ANTIALIASING_NONE) {
+                globals.antialiasing_type = ANTIALIASING_FXAA;
+            } else if (globals.antialiasing_type == ANTIALIASING_FXAA) {
+                globals.antialiasing_type = ANTIALIASING_NONE;
+            }
+        }
+        
         if (globals.should_show_cursor) {
             SDL_SetWindowRelativeMouseMode(globals.window, false);
         } else {

@@ -22,6 +22,11 @@ struct Mesh;
 struct Framebuffer;
 struct Mesh_Catalog;
 
+enum Antialiasing_Type {
+    ANTIALIASING_NONE,
+    ANTIALIASING_FXAA,
+};
+
 enum Render_Stage {
     RENDER_STAGE_SHADOW,
     RENDER_STAGE_MAIN,
@@ -63,6 +68,8 @@ struct Global_Variables {
 
     int render_target_width  = 0;
     int render_target_height = 0;
+
+    Antialiasing_Type antialiasing_type = ANTIALIASING_NONE;
     
     Camera camera = {};
     Camera_Type camera_type = CAMERA_TYPE_FPS;
@@ -84,6 +91,7 @@ struct Global_Variables {
     Shader *shader_resolve = NULL;
     Shader *shader_resolve_msaa = NULL;
     Shader *shader_skybox = NULL;
+    Shader *shader_fxaa = NULL;
 
     Mesh *mesh = NULL;
     
