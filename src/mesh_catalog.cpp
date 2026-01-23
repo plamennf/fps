@@ -16,11 +16,8 @@ struct Mesh_Load_Job {
 
 static void mesh_load_job(void *ptr) {
     Mesh_Load_Job *job = (Mesh_Load_Job *)ptr;
-
-    logprintf("Mesh load job!!!\n");
     
     if (!load_mesh(job->entry->mesh, job->filepath)) {
-        logprintf("Filepath: %s\n", job->filepath);
         job->entry->state = MESH_STATE_FAILED;
     } else {
         job->entry->state = MESH_STATE_CPU_READY;
@@ -84,8 +81,6 @@ Mesh *Mesh_Catalog::find_or_load(char *name) {
 }
 
 static void upload_mesh_buffers_to_gpu(Mesh *mesh) {
-    logprintf("Uploading mesh buffers to gpu!!!\n");
-    
     for (int i = 0; i < mesh->num_submeshes; i++) {
         Submesh *submesh = &mesh->submeshes[i];
 

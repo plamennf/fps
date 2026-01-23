@@ -1,12 +1,20 @@
+- Add crosshair(make it customizable like CS:GO)
+- Add day/night skyboxes and adjust lights accordingly. Do it with an #ifdef for now. Later can do it as a blend between the two skyboxes in the shader depending on a time value or something like that.
+- Find a 3D image of a city, which i can put as a billboard behind the warehouse, as a background.
+- Make the platform narrower, so it's like a pier.
+- Add extra cubes to make minor adjustments into the pier. In the future maybe just use a map to sample the terrain.
+- Add realistic infinite water(like ocean) behind the pier.
+- Add skeletal animation.
+
 - Add menu.
-- Fix msaa support.
 - Add PBR.
-- Add multithreaded asset loading.
 - Add texture to the terrain cube.
 - Add multithreaded rendering.
 
 - Add console.
 - Add noclip command.
+- Add godmode command.
+- Add crosshair customization commands.
 - Add editor mode where the camera is noclip by default.
 - Add ability to pick objects and display their properties.
 - Add ability to move/rotate/scale objects.
