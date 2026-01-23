@@ -74,6 +74,8 @@ enum Texture_Type {
     TEXTURE_DIFFUSE,
     TEXTURE_SPECULAR,
     TEXTURE_NORMAL,
+    //TEXTURE_METALLIC_ROUGHNESS,
+    TEXTURE_TYPE_COUNT,
 };
 
 struct Texture {
@@ -189,6 +191,6 @@ void rendering_3d_shadow_map(int cascade_index);
 void draw_text(Font *font, char *text, int x, int y, Vector4 color);
 
 struct Mesh;
-void draw_mesh(Mesh *mesh, Vector3 position, Vector3 rotation, float scale);
+void draw_mesh(Mesh *mesh, Vector3 position, Quaternion rotation, Vector3 scale, Vector4 scale_color);
 
-void draw_cube(Vector3 position, Vector3 rotation, Vector3 scale, Vector4 color);
+void draw_cube(Vector3 position, Quaternion rotation, Vector3 scale, Vector4 color);

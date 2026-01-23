@@ -1,6 +1,8 @@
 #include "main.h"
 #include "camera.h"
 
+#include <tracy/Tracy.hpp>
+
 void init_camera(Camera *camera, Vector3 position, float pitch, float yaw, float roll) {
     camera->position = position;
     camera->target   = position - v3(0, 0, 1);
@@ -131,6 +133,8 @@ void update_camera_noclip(Camera *camera) {
 }
 
 void update_camera(Camera *camera, Camera_Type type) {
+    ZoneScoped;
+    
     switch (type) {
         case CAMERA_TYPE_FPS: {
             update_camera_fps(camera);
@@ -143,6 +147,8 @@ void update_camera(Camera *camera, Camera_Type type) {
 }
 
 void fixed_update_camera(Camera *camera, Camera_Type type) {
+    ZoneScoped;
+    
     switch (type) {
         case CAMERA_TYPE_FPS: {
             fixed_update_camera_fps(camera);

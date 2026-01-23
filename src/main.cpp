@@ -1,14 +1,19 @@
+#include <tracy/Tracy.hpp>
+
 #include "main.h"
 #include "draw.h"
 #include "font.h"
 #include "mesh.h"
 #include "mesh_catalog.h"
+#include "entity.h"
+#include "entity_manager.h"
 
 #include <SDL3/SDL_main.h>
 #include <GL/glew.h>
 #include <stdio.h>
 #include <float.h>
 #include <limits.h>
+#include <stdlib.h>
 
 Global_Variables globals = {};
 
@@ -56,6 +61,48 @@ static void update_time() {
     }
 }
 
+static void init_test_world() {
+    Entity_Manager *manager = globals.entity_manager;
+    
+    Entity *cube      = make_entity(manager);
+    cube->position    = v3(1, 1, 0);
+    cube->orientation = Quaternion();
+    cube->scale       = v3(2, 2, 2);
+    cube->scale_color = v4(0, 0, 1, 1);
+
+    Entity *warehouse      = make_entity(manager);
+    warehouse->position    = v3(-25, 0.1f, 0);
+    set_from_axis_and_angle(&warehouse->orientation, v3(1, 0, 0), 90.0f);
+    warehouse->scale       = v3(1);
+    warehouse->scale_color = v4(1, 1, 1, 1);
+    set_mesh(warehouse, "Warehouse");
+    
+    Entity *demon = make_entity(manager);
+    demon->position    = v3(0, 0, -25);
+    set_from_axis_and_angle(&demon->orientation, v3(0, 1, 0), -90.0f);
+    demon->scale       = v3(1, 1, 1);
+    demon->scale_color = v4(100, 0, 0, 1);
+    set_mesh(demon, "Demon");
+
+    Entity *birb = make_entity(manager);
+    birb->position    = v3(0, 0, 25);
+    set_from_axis_and_angle(&birb->orientation, v3(0, 1, 0), -90.0f);
+    birb->scale       = v3(1, 1, 1);
+    birb->scale_color = v4(0, 0, 2000, 1);
+    set_mesh(birb, "Birb");
+
+    Entity *zombie      = make_entity(manager);
+    zombie->position    = v3(25, 0, 0);
+    zombie->scale       = v3(0.013f);
+    zombie->scale_color = v4(1, 1, 1, 1);
+    set_mesh(zombie, "Zombie");
+
+    Quaternion zombie_zr, zombie_yr;
+    set_from_axis_and_angle(&zombie_zr, v3(0, 0, 1), 90.0f);
+    set_from_axis_and_angle(&zombie_yr, v3(0, 1, 0), 90.0f);
+    zombie->orientation = zombie_yr * zombie_zr;
+}
+
 int main(int argc, char *argv[]) {
     if (!SDL_Init(SDL_INIT_VIDEO)) {
         logprintf("Failed to initialize SDL: %s\n", SDL_GetError());
@@ -63,6 +110,12 @@ int main(int argc, char *argv[]) {
     }
     defer { SDL_Quit(); };
 
+    {
+        SDL_Time current_time;
+        SDL_GetCurrentTime(&current_time);
+        srand((u32)current_time);
+    }
+    
     globals.window_width  = 1280;
     globals.window_height = 720;
     
@@ -134,17 +187,16 @@ int main(int argc, char *argv[]) {
         "data/textures/night/back.png",
     };
     globals.skybox = load_cubemap(skybox_filepaths);
-    
-    globals.mesh = globals.mesh_catalog->find_or_load("Demon");
-    if (!globals.mesh) return 1;
-    //if (!load_mesh(globals.mesh, "data/meshes/Yeti.gltf")) return 1;
-    //if (!load_mesh(globals.mesh, "data/meshes/knight.gltf")) return 1;
-    //if (!load_mesh(globals.mesh, "data/meshes/knight.mesh")) return 1;
-    
+
+    globals.entity_manager = new Entity_Manager();
+    init_test_world();
+        
     toggle_fullscreen();
     
     SDL_GetCurrentTime(&globals.time_info.last_time);
     while (!globals.should_quit) {
+        ZoneScoped;
+        
         update_time();
         
         globals.mouse_x_delta = 0.0f;
@@ -236,8 +288,12 @@ int main(int argc, char *argv[]) {
         }
 
         draw_one_frame();
+
+        do_entity_destruction(globals.entity_manager);
         
         swap_buffers();
+
+        FrameMark;
     }
     
     return 0;

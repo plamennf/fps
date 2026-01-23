@@ -304,6 +304,16 @@ inline Vector3 make_vector3(float x, float y, float z) {
     return result;
 }
 
+inline Vector3 make_vector3(float v) {
+    Vector3 result;
+
+    result.x = v;
+    result.y = v;
+    result.z = v;
+
+    return result;
+}
+
 inline Vector3 make_vector3(Vector2 xy, float z) {
     Vector3 result;
 
@@ -1215,4 +1225,24 @@ inline bool are_rect_and_circle_colliding(Rectangle2 rect, Vector2 position, flo
     float dy = position.y - closest_y;
 
     return (dx * dx + dy * dy) <= (radius * radius);
+}
+
+inline Matrix4 make_transformation_matrix(Vector3 position, Quaternion rotation, Vector3 scale) {
+    Matrix4 m = matrix4_identity();
+
+    m._14 = position.x;
+    m._24 = position.y;
+    m._34 = position.z;
+
+    m._11 = scale.x;
+    m._22 = scale.y;
+    m._33 = scale.z;
+
+    Matrix4 r = get_rotation_matrix(rotation);
+    
+    return m * r;
+}
+
+inline Matrix4 make_transformation_matrix(Vector3 position, Quaternion rotation, float scale) {
+    return make_transformation_matrix(position, rotation, scale);
 }

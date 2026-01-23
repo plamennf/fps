@@ -62,6 +62,7 @@ uniform vec3 camera_position;
 uniform sampler2D diffuse_texture;
 uniform sampler2D specular_texture;
 uniform sampler2D normal_texture;
+uniform sampler2D metallic_roughness_texture;
 uniform sampler2D shadow_map_textures[NUM_SHADOW_MAP_CASCADES];
 
 uniform mat4 light_matrices[NUM_SHADOW_MAP_CASCADES];
@@ -129,7 +130,7 @@ vec3 calculate_directional_light(Directional_Light light, vec3 normal, vec3 view
     vec3 ambient  = light.ambient  * diffuse_color.rgb;
     vec3 diffuse  = light.diffuse  * diff * diffuse_color.rgb;
     vec3 specular = light.specular * spec * specular_color.rgb;
-    return (ambient + (1.0 - shadow) * (diffuse + specular));
+    return (ambient + ((1.0 - shadow) * (diffuse + specular)));
     //return (ambient + diffuse + specular);
 }
 
@@ -258,7 +259,6 @@ void main(void) {
         view_dir *= TBN;
     }
 
-    //float shadow = calculate_shadow(vertex_pos_light_space);
     float shadow = calculate_shadow();
     vec3 accum = calculate_directional_light(directional_light, normal, view_dir, diffuse_color, specular_color, shadow);
 

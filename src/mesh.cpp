@@ -159,6 +159,52 @@ bool load_mesh_gltf(Mesh *mesh, char *filepath) {
                     submesh->material.diffuse_texture = globals.white_texture;
                 }
 
+                if (material->pbr_specular_glossiness.diffuse_texture.texture && submesh->material.diffuse_texture == globals.white_texture) {
+                    cgltf_texture *texture = material->pbr_specular_glossiness.diffuse_texture.texture;
+                    if (texture->image) {
+                        char *texture_path_orig = NULL;
+                        if (texture->image->uri) {
+                            texture_path_orig = copy_string(texture->image->uri);
+                        } else if (texture->image->name) {
+                            bool has_extension = true;
+                            s64 new_string_len = string_length(texture->image->name) + 1;
+                            if (!strstr(texture->image->name, ".")) {
+                                new_string_len += 4;
+                                has_extension = false;
+                            }
+                            
+                            texture_path_orig = new char[new_string_len];
+                            if (has_extension) {
+                                memcpy(texture_path_orig, texture->image->name, new_string_len);
+                            } else {
+                                memcpy(texture_path_orig, texture->image->name, string_length(texture->image->name));
+                                memcpy(texture_path_orig + string_length(texture->image->name), ".png", 5);
+                            }
+                        }
+
+                        if (texture_path_orig) {
+                            defer { delete [] texture_path_orig; };
+                            
+                            // TODO: Give these variables better names.
+                            char *texture_path = strrchr(texture_path_orig, '/');
+                            if (texture_path) {
+                                texture_path++;
+                            } else {
+                                texture_path = texture_path_orig;
+                            }
+
+                            char full_path[1024];
+                            snprintf(full_path, sizeof(full_path), "data/textures/%s", texture_path);
+                        
+                            submesh->material.diffuse_texture = load_texture(full_path);
+                        } else {
+                            submesh->material.diffuse_texture = globals.white_texture;
+                        }
+                    }
+                } else {
+                    //submesh->material.diffuse_texture = globals.white_texture;
+                }
+
                 if (material->specular.specular_texture.texture) {
                     cgltf_texture *texture = material->specular.specular_texture.texture;
                     if (texture->image && texture->image->uri) {

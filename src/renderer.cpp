@@ -220,7 +220,7 @@ void draw_text(Font *font, char *text, int x, int y, Vector4 color) {
     immediate_flush();
 }
 
-void draw_mesh(Mesh *mesh, Vector3 position, Vector3 rotation, float scale) {
+void draw_mesh(Mesh *mesh, Vector3 position, Quaternion rotation, Vector3 scale, Vector4 scale_color) {
     if (globals.render_stage == RENDER_STAGE_MAIN) {
         set_shader(globals.shader_basic);
     } else {
@@ -241,14 +241,22 @@ void draw_mesh(Mesh *mesh, Vector3 position, Vector3 rotation, float scale) {
         if (submesh->material.normal_texture) {
             set_texture(TEXTURE_NORMAL, submesh->material.normal_texture);
         }
+
+        Vector4 diffuse_color = submesh->material.diffuse_color;
+        submesh->material.diffuse_color.r *= scale_color.r;
+        submesh->material.diffuse_color.g *= scale_color.g;
+        submesh->material.diffuse_color.b *= scale_color.b;
+        submesh->material.diffuse_color.a *= scale_color.a;
         
         refresh_material(&submesh->material);
         
         draw_indexed(submesh->num_indices, 0);
+
+        submesh->material.diffuse_color = diffuse_color;
     }
 }
 
-void draw_cube(Vector3 position, Vector3 rotation, Vector3 scale, Vector4 color) {
+void draw_cube(Vector3 position, Quaternion rotation, Vector3 scale, Vector4 color) {
     if (get_current_shader() != globals.shader_skybox) {
         if (globals.render_stage == RENDER_STAGE_MAIN) {
             set_shader(globals.shader_basic);
@@ -258,6 +266,8 @@ void draw_cube(Vector3 position, Vector3 rotation, Vector3 scale, Vector4 color)
     }
 
     globals.transform.world_matrix = make_transformation_matrix(position, rotation, scale);
+    refresh_transform();
+    
     refresh_transform();
     
     set_vertex_buffer(cube_vertex_buffer);

@@ -1,13 +1,19 @@
 #include "draw.h"
 #include "main.h"
 #include "font.h"
+#include "entity.h"
+#include "entity_manager.h"
+#include "mesh_catalog.h"
 
+#include <tracy/Tracy.hpp>
 #include <stdio.h>
 
 static Framebuffer *offscreen_buffer = NULL;
 static Framebuffer *shadow_map_cascade_buffers[NUM_SHADOW_MAP_CASCADES] = {};
 
 void init_shaders() {
+    ZoneScoped;
+    
     globals.shader_color        = load_shader("data/shaders/color.glsl", RENDER_VERTEX_IMMEDIATE);
     globals.shader_texture      = load_shader("data/shaders/texture.glsl", RENDER_VERTEX_IMMEDIATE);
     globals.shader_basic        = load_shader("data/shaders/basic.glsl", RENDER_VERTEX_MESH);
@@ -29,7 +35,9 @@ int get_num_multisamples(Antialiasing_Type type) {
     return 0;
 }
 
-void init_framebuffers() {    
+void init_framebuffers() {
+    ZoneScoped;
+    
     if (offscreen_buffer) {
         destroy_framebuffer(offscreen_buffer);
         offscreen_buffer = NULL;
@@ -180,13 +188,34 @@ void rendering_3d_shadow_map(int cascade_index) {
 }
 
 static void draw_scene() {
-    draw_cube(v3(0, -1, 0), v3(0, 0, 0), v3(200, 2.0f, 200.0f), v4(0, 1, 0, 1));
+    ZoneScoped;
+
+    draw_cube(v3(0, -1, 0), Quaternion(), v3(200, 2.0f, 200.0f), v4(0, 1, 0, 1));
+
+    /*
+    Mesh *mesh = globals.mesh_catalog->find_or_load("knight");
+    draw_mesh(mesh, globals.camera.position - v3(0, 2, 0), Quaternion(), v3(0.008f), v4(1, 1, 1, 1));
+    */
+    
+    auto manager = globals.entity_manager;
+    for (Entity *e : manager->all_entities) {
+        if (e->mesh == NULL) {
+            draw_cube(e->position, e->orientation, e->scale, e->scale_color);
+        } else {
+            draw_mesh(e->mesh, e->position, e->orientation, e->scale, e->scale_color);
+        }
+    }
+
+#if 0
     draw_cube(v3(1, 1, -25), v3(0, 0, 0), v3(2, 2, 2), v4(0, 0, 1, 1));
     draw_mesh(globals.mesh, v3(0, 0, -50), v3(0, 90, 0), 1.0f);
     //draw_mesh(globals.mesh, v3(0, 0, -50), v3(0, 0, 0), 0.01f);
+#endif
 }
 
 void draw_one_frame() {
+    ZoneScoped;
+    
     init_lights();
     
     // Reset the depth write before clearing as set_depth_write(false) before 2D drawing
@@ -216,7 +245,7 @@ void draw_one_frame() {
     set_cull_face(CULL_FACE_FRONT);
     set_shader(globals.shader_skybox);
     set_cube_map(globals.skybox);
-    draw_cube(v3(0, 0, 0), v3(0, 0, 0), v3(2, 2, 2), v4(1, 1, 1, 1));
+    draw_cube(v3(0, 0, 0), Quaternion(), v3(2, 2, 2), v4(1, 1, 1, 1));
     set_shader(NULL);
     
     // 2D Drawing:

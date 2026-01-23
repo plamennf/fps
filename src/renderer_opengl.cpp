@@ -297,7 +297,7 @@ void set_shadow_map(Framebuffer *_framebuffer, int index) {
     assert(_framebuffer);
     Framebuffer_Gl *framebuffer = (Framebuffer_Gl *)_framebuffer;
 
-    glActiveTexture(GL_TEXTURE3 + index);
+    glActiveTexture(GL_TEXTURE0 + TEXTURE_TYPE_COUNT + index);
     glBindTexture(GL_TEXTURE_2D, framebuffer->depth_id);
 }
 

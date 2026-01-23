@@ -1,12 +1,12 @@
 @echo off
 
-set BuildDebug=1
+set BuildDebug=0
 
 if not exist build mkdir build
 pushd build
 
-set CompilerFlags= /Oi /fp:fast /fp:except- /Zi /FC /nologo /W3 /I ..\external\include /std:c++20 /Zc:strictStrings- /EHsc-
-set Defines= /D_CRT_SECURE_NO_WARNINGS /DRENDER_OPENGL /DOS_WINDOWS /DCOMPILER_MSVC /DUNICODE /D_UNICODE /DGLFW_INCLUDE_NONE
+set CompilerFlags= /Oi /fp:fast /fp:except- /Zi /FC /nologo /W3 /I ..\external\include /std:c++20 /Zc:strictStrings- /EHsc- /I ..\tracy\
+set Defines= /D_CRT_SECURE_NO_WARNINGS /DRENDER_OPENGL /DOS_WINDOWS /DCOMPILER_MSVC /DUNICODE /D_UNICODE /DGLFW_INCLUDE_NONE /DTRACY_ENABLE
 set LinkerFlags= /opt:ref /incremental:no /subsystem:console /LIBPATH:"..\external\lib"
 set Libs= SDL3.lib glew32.lib opengl32.lib freetype.lib
 
@@ -19,7 +19,7 @@ if %BuildDebug%==0 set Defines= /DNDEBUG /DBUILD_RELEASE %Defines%
 if %BuildDebug%==1 set LinkerFlags= /LIBPATH:"..\external\lib\Debug" %LinkerFlags%
 if %BuildDebug%==0 set LinkerFlags= /LIBPATH:"..\external\lib\Release" %LinkerFlags%
 
-cl %CompilerFlags% %Defines% /Fe:"fps" ..\src\*.cpp /link %LinkerFlags% %Libs%
+cl %CompilerFlags% %Defines% /Fe:"fps" ..\src\*.cpp ..\tracy\TracyClient.cpp /link %LinkerFlags% %Libs%
 
 xcopy /y /d ..\external\lib\*.dll
 REM if %BuildSlow%==1 xcopy /y /d ..\external\lib\Debug\*.dll
