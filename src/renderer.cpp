@@ -174,29 +174,6 @@ void rendering_3d() {
     set_depth_write(true);
 }
 
-void rendering_3d_shadow_map(int cascade_index) {
-#if 0
-    float half_scene_size = 200.0f;
-    Matrix4 light_projection = make_orthographic(-half_scene_size, half_scene_size, -half_scene_size, half_scene_size, 0.1f, 1000.0f);
-    //Matrix4 light_view = make_look_at_matrix(globals.directional_light.direction * -500.0f, v3(0, 0, 0), v3(0, 1, 0));
-    Matrix4 light_view = make_look_at_matrix(globals.directional_light.direction * -1.0f, v3(0, 0, 0), v3(0, 1, 0));
-    globals.transform.light_matrix = light_projection * light_view;
-#else
-    globals.transform.light_matrix = globals.shadow_map_cascade_matrices[cascade_index];
-#endif
-
-    refresh_transform();
-
-    set_blend_mode(BLEND_MODE_OFF);
-    set_depth_test(DEPTH_TEST_LESS);
-    set_cull_face(CULL_FACE_FRONT);
-    set_depth_write(true);
-
-    for (int i = 0; i < NUM_SHADOW_MAP_CASCADES; i++) {
-        set_shadow_map(globals.shadow_map_cascade_buffers[i], i);
-    }
-}
-
 void draw_text(Font *font, char *text, int x, int y, Vector4 color) {
     set_shader(globals.shader_texture);
     set_texture(TEXTURE_DIFFUSE, font->texture);

@@ -42,7 +42,12 @@ struct Time_Info {
     s64 dt_ns;
 
     float dt;
-
+    
+    // For fixed dt updates
+    float accumulated_dt = 0.0f;
+    int fixed_update_fps_cap = 61;
+    float fixed_update_dt = 1.0f / (float)fixed_update_fps_cap;
+    
     // Debug draw hud info:
     int num_frames_since_last_fps_update;
     float accumulated_fps_dt;
@@ -81,8 +86,6 @@ struct Global_Variables {
     Texture *black_texture = NULL;
     Texture *skybox = NULL;
     
-    Framebuffer *offscreen_buffer = NULL;
-    Framebuffer *shadow_map_cascade_buffers[NUM_SHADOW_MAP_CASCADES] = {};
     Matrix4 shadow_map_cascade_matrices[NUM_SHADOW_MAP_CASCADES] = {};
     float shadow_map_cascade_splits[NUM_SHADOW_MAP_CASCADES] = { 30.0f, 100.0f, 200.0f, 400.0f };
     

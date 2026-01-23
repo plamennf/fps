@@ -1,5 +1,7 @@
 #pragma once
 
+#include "geometry.h"
+
 struct Font;
 struct Material;
 
@@ -135,7 +137,7 @@ struct Transform {
     Matrix4 light_matrix;
 };
 
-void init_renderer(SDL_Window *window);
+void init_renderer(struct SDL_Window *window);
 void swap_buffers();
 
 void set_blend_mode(Blend_Mode blend_mode);

@@ -61,15 +61,19 @@ void update_camera_fps(Camera *camera) {
 
     camera->target.y = sinf(to_radians(camera->pitch));
     camera->target   = normalize_or_zero(camera->target);
+}
 
+void fixed_update_camera_fps(Camera *camera) {
+    float dt = globals.time_info.fixed_update_dt;
+    
     if (is_key_down(SDL_SCANCODE_SPACE)) {
         if (camera->is_on_ground) {
-            camera->jump_velocity = 0.2f;
+            camera->jump_velocity = 0.5f;
             camera->is_on_ground  = false;
         }
     }
 
-    camera->jump_velocity -= 0.5f * dt;
+    camera->jump_velocity -= 1.0f * dt;
 
     camera->position.y += camera->jump_velocity;
 
@@ -134,6 +138,14 @@ void update_camera(Camera *camera, Camera_Type type) {
 
         case CAMERA_TYPE_NOCLIP: {
             update_camera_noclip(camera);
+        } break;
+    }
+}
+
+void fixed_update_camera(Camera *camera, Camera_Type type) {
+    switch (type) {
+        case CAMERA_TYPE_FPS: {
+            fixed_update_camera_fps(camera);
         } break;
     }
 }

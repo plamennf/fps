@@ -20,4 +20,5 @@ struct Camera {
 
 void init_camera(Camera *camera, Vector3 position, float pitch, float yaw, float roll);
 void update_camera(Camera *camera, Camera_Type type);
+void fixed_update_camera(Camera *camera, Camera_Type type);
 Matrix4 get_view_matrix(Camera *camera);
