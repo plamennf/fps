@@ -1,5 +1,6 @@
 #include "main.h"
 #include "mesh.h"
+#include "texture_catalog.h"
 
 #define CGLTF_IMPLEMENTATION
 #include <cgltf.h>
@@ -118,87 +119,65 @@ bool load_mesh_gltf(Mesh *mesh, char *filepath) {
                     if (texture->image) {
                         char *texture_path_orig = NULL;
                         if (texture->image->uri) {
-                            texture_path_orig = copy_string(texture->image->uri);
+                            texture_path_orig = texture->image->uri;
                         } else if (texture->image->name) {
-                            bool has_extension = true;
-                            s64 new_string_len = string_length(texture->image->name) + 1;
-                            if (!strstr(texture->image->name, ".")) {
-                                new_string_len += 4;
-                                has_extension = false;
-                            }
-                            
-                            texture_path_orig = new char[new_string_len];
-                            if (has_extension) {
-                                memcpy(texture_path_orig, texture->image->name, new_string_len);
-                            } else {
-                                memcpy(texture_path_orig, texture->image->name, string_length(texture->image->name));
-                                memcpy(texture_path_orig + string_length(texture->image->name), ".png", 5);
-                            }
+                            texture_path_orig = texture->image->name;
                         }
 
                         if (texture_path_orig) {
-                            defer { delete [] texture_path_orig; };
+                            char *texture_name_orig = copy_string(texture_path_orig);
+                            defer { delete [] texture_name_orig; };
                             
-                            // TODO: Give these variables better names.
-                            char *texture_path = strrchr(texture_path_orig, '/');
-                            if (texture_path) {
-                                texture_path++;
+                            char *texture_name = strrchr(texture_name_orig, '/');
+                            if (texture_name) {
+                                texture_name++;
                             } else {
-                                texture_path = texture_path_orig;
+                                texture_name = texture_name_orig;
                             }
 
-                            char full_path[1024];
-                            snprintf(full_path, sizeof(full_path), "data/textures/%s", texture_path);
-                        
-                            submesh->material.diffuse_texture = load_texture(full_path);
+                            char *texture_name_end = strrchr(texture_name, '.');
+                            if (texture_name_end) {
+                                texture_name[texture_name_end - texture_name] = 0;
+                            }
+
+                            submesh->material.diffuse_texture_name = copy_string(texture_name);
                         } else {
-                            submesh->material.diffuse_texture = globals.white_texture;
+                            submesh->material.diffuse_texture_name = NULL;
                         }
                     }
                 } else {
-                    submesh->material.diffuse_texture = globals.white_texture;
+                    submesh->material.diffuse_texture_name = NULL;
                 }
 
-                if (material->pbr_specular_glossiness.diffuse_texture.texture && submesh->material.diffuse_texture == globals.white_texture) {
+                if (material->pbr_specular_glossiness.diffuse_texture.texture && submesh->material.diffuse_texture_name == NULL) {
                     cgltf_texture *texture = material->pbr_specular_glossiness.diffuse_texture.texture;
                     if (texture->image) {
                         char *texture_path_orig = NULL;
                         if (texture->image->uri) {
-                            texture_path_orig = copy_string(texture->image->uri);
+                            texture_path_orig = texture->image->uri;
                         } else if (texture->image->name) {
-                            bool has_extension = true;
-                            s64 new_string_len = string_length(texture->image->name) + 1;
-                            if (!strstr(texture->image->name, ".")) {
-                                new_string_len += 4;
-                                has_extension = false;
-                            }
-                            
-                            texture_path_orig = new char[new_string_len];
-                            if (has_extension) {
-                                memcpy(texture_path_orig, texture->image->name, new_string_len);
-                            } else {
-                                memcpy(texture_path_orig, texture->image->name, string_length(texture->image->name));
-                                memcpy(texture_path_orig + string_length(texture->image->name), ".png", 5);
-                            }
+                            texture_path_orig = texture->image->name;
                         }
 
                         if (texture_path_orig) {
-                            defer { delete [] texture_path_orig; };
+                            char *texture_name_orig = copy_string(texture_path_orig);
+                            defer { delete [] texture_name_orig; };
                             
-                            // TODO: Give these variables better names.
-                            char *texture_path = strrchr(texture_path_orig, '/');
-                            if (texture_path) {
-                                texture_path++;
+                            char *texture_name = strrchr(texture_name_orig, '/');
+                            if (texture_name) {
+                                texture_name++;
                             } else {
-                                texture_path = texture_path_orig;
+                                texture_name = texture_name_orig;
                             }
 
-                            char full_path[1024];
-                            snprintf(full_path, sizeof(full_path), "data/textures/%s", texture_path);
-                        
-                            submesh->material.diffuse_texture = load_texture(full_path);
+                            char *texture_name_end = strrchr(texture_name, '.');
+                            if (texture_name_end) {
+                                texture_name[texture_name_end - texture_name] = 0;
+                            }
+
+                            submesh->material.diffuse_texture_name = copy_string(texture_name);
                         } else {
-                            submesh->material.diffuse_texture = globals.white_texture;
+                            submesh->material.diffuse_texture_name = NULL;
                         }
                     }
                 } else {
@@ -207,52 +186,72 @@ bool load_mesh_gltf(Mesh *mesh, char *filepath) {
 
                 if (material->specular.specular_texture.texture) {
                     cgltf_texture *texture = material->specular.specular_texture.texture;
-                    if (texture->image && texture->image->uri) {
-                        char *texture_path_orig = copy_string(texture->image->uri);
-                        defer { delete [] texture_path_orig; };
-
-                        // TODO: Give these variables better names.
-                        char *texture_path = strrchr(texture_path_orig, '/');
-                        if (texture_path) {
-                            texture_path++;
-                        } else {
-                            texture_path = texture_path_orig;
+                    if (texture->image) {
+                        char *texture_path_orig = NULL;
+                        if (texture->image->uri) {
+                            texture_path_orig = texture->image->uri;
+                        } else if (texture->image->name) {
+                            texture_path_orig = texture->image->name;
                         }
 
-                        char full_path[1024];
-                        snprintf(full_path, sizeof(full_path), "data/textures/%s", texture_path);
-                        
-                        submesh->material.specular_texture = load_texture(full_path);
-                    } else {
-                        submesh->material.specular_texture = globals.white_texture;
+                        if (texture_path_orig) {
+                            char *texture_name_orig = copy_string(texture_path_orig);
+                            defer { delete [] texture_name_orig; };
+                            
+                            char *texture_name = strrchr(texture_name_orig, '/');
+                            if (texture_name) {
+                                texture_name++;
+                            } else {
+                                texture_name = texture_name_orig;
+                            }
+
+                            char *texture_name_end = strrchr(texture_name, '.');
+                            if (texture_name_end) {
+                                texture_name[texture_name_end - texture_name] = 0;
+                            }
+
+                            submesh->material.specular_texture_name = copy_string(texture_name);
+                        } else {
+                            submesh->material.specular_texture_name = NULL;
+                        }
                     }
                 } else {
-                    submesh->material.specular_texture = globals.white_texture;
+                    submesh->material.specular_texture_name = NULL;
                 }
 
                 if (material->normal_texture.texture) {
                     cgltf_texture *texture = material->normal_texture.texture;
-                    if (texture->image && texture->image->uri) {
-                        char *texture_path_orig = copy_string(texture->image->uri);
-                        defer { delete [] texture_path_orig; };
-
-                        // TODO: Give these variables better names.
-                        char *texture_path = strrchr(texture_path_orig, '/');
-                        if (texture_path) {
-                            texture_path++;
-                        } else {
-                            texture_path = texture_path_orig;
+                    if (texture->image) {
+                        char *texture_path_orig = NULL;
+                        if (texture->image->uri) {
+                            texture_path_orig = texture->image->uri;
+                        } else if (texture->image->name) {
+                            texture_path_orig = texture->image->name;
                         }
 
-                        char full_path[1024];
-                        snprintf(full_path, sizeof(full_path), "data/textures/%s", texture_path);
-                        
-                        submesh->material.normal_texture = load_texture(full_path);
-                    } else {
-                        submesh->material.normal_texture = NULL;
+                        if (texture_path_orig) {
+                            char *texture_name_orig = copy_string(texture_path_orig);
+                            defer { delete [] texture_name_orig; };
+                            
+                            char *texture_name = strrchr(texture_name_orig, '/');
+                            if (texture_name) {
+                                texture_name++;
+                            } else {
+                                texture_name = texture_name_orig;
+                            }
+
+                            char *texture_name_end = strrchr(texture_name, '.');
+                            if (texture_name_end) {
+                                texture_name[texture_name_end - texture_name] = 0;
+                            }
+
+                            submesh->material.normal_texture_name = copy_string(texture_name);
+                        } else {
+                            submesh->material.normal_texture_name = NULL;
+                        }
                     }
                 } else {
-                    submesh->material.normal_texture = NULL;
+                    submesh->material.normal_texture_name = NULL;
                 }
 
                 Vector4 gltf_base_color_factor;
@@ -311,20 +310,20 @@ bool save_mesh(Mesh *mesh, char *filepath) {
         fwrite(&submesh->num_indices, sizeof(int), 1, file);
         fwrite(submesh->indices, sizeof(u32), submesh->num_indices, file);
 
-        if (submesh->material.diffuse_texture && submesh->material.diffuse_texture != globals.white_texture) {
-            save_binary_string(file, submesh->material.diffuse_texture->filepath);
+        if (submesh->material.diffuse_texture_name) {
+            save_binary_string(file, submesh->material.diffuse_texture_name);
         } else {
             save_binary_string(file, "-");
         }
 
-        if (submesh->material.specular_texture && submesh->material.specular_texture != globals.white_texture) {
-            save_binary_string(file, submesh->material.specular_texture->filepath);
+        if (submesh->material.specular_texture_name) {
+            save_binary_string(file, submesh->material.specular_texture_name);
         } else {
             save_binary_string(file, "-");
         }
 
-        if (submesh->material.normal_texture) {
-            save_binary_string(file, submesh->material.normal_texture->filepath);
+        if (submesh->material.normal_texture_name) {
+            save_binary_string(file, submesh->material.normal_texture_name);
         } else {
             save_binary_string(file, "-");
         }
@@ -381,9 +380,9 @@ bool load_mesh_custom(Mesh *mesh, char *filepath) {
         diffuse_texture_filepath[diffuse_texture_filepath_len] = 0;
 
         if (diffuse_texture_filepath[0] == '-') {
-            submesh->material.diffuse_texture = globals.white_texture;
+            submesh->material.diffuse_texture_name = NULL;
         } else {
-            submesh->material.diffuse_texture = load_texture(diffuse_texture_filepath);
+            submesh->material.diffuse_texture_name = copy_string(diffuse_texture_filepath);
         }
 
         int specular_texture_filepath_len = 0;
@@ -394,9 +393,9 @@ bool load_mesh_custom(Mesh *mesh, char *filepath) {
         specular_texture_filepath[specular_texture_filepath_len] = 0;
 
         if (specular_texture_filepath[0] == '-') {
-            submesh->material.specular_texture = globals.white_texture;
+            submesh->material.specular_texture_name = NULL;
         } else {
-            submesh->material.specular_texture = load_texture(specular_texture_filepath);
+            submesh->material.specular_texture_name = copy_string(specular_texture_filepath);
         }
 
         int normal_texture_filepath_len = 0;
@@ -407,15 +406,15 @@ bool load_mesh_custom(Mesh *mesh, char *filepath) {
         normal_texture_filepath[normal_texture_filepath_len] = 0;
 
         if (normal_texture_filepath[0] == '-') {
-            submesh->material.normal_texture = NULL;
+            submesh->material.normal_texture_name = NULL;
         } else {
-            submesh->material.normal_texture = load_texture(normal_texture_filepath);
+            submesh->material.normal_texture_name = copy_string(normal_texture_filepath);
         }
 
         fread(&submesh->material.diffuse_color.x, sizeof(float), 4, file);
         fread(&submesh->material.shininess, sizeof(float), 1, file);
     }
-
+    
     fclose(file);
     
     return true;

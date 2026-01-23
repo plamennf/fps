@@ -2,6 +2,7 @@
 #include "renderer.h"
 #include "font.h"
 #include "mesh.h"
+#include "texture_catalog.h"
 
 #include <GL/glew.h>
 #include <float.h> // For FLT_MAX, FLT_MIN
@@ -236,10 +237,28 @@ void draw_mesh(Mesh *mesh, Vector3 position, Quaternion rotation, Vector3 scale,
         set_vertex_buffer(submesh->vertex_buffer);
         set_index_buffer(submesh->index_buffer);
 
-        set_texture(TEXTURE_DIFFUSE,  submesh->material.diffuse_texture);
-        set_texture(TEXTURE_SPECULAR, submesh->material.specular_texture);
-        if (submesh->material.normal_texture) {
-            set_texture(TEXTURE_NORMAL, submesh->material.normal_texture);
+        Texture *diffuse_texture = globals.white_texture;
+        if (submesh->material.diffuse_texture_name) {
+            diffuse_texture = globals.texture_catalog->find_or_load(submesh->material.diffuse_texture_name);
+            if (!diffuse_texture) diffuse_texture = globals.white_texture;
+        }
+
+        Texture *specular_texture = globals.white_texture;
+        if (submesh->material.specular_texture_name) {
+            specular_texture = globals.texture_catalog->find_or_load(submesh->material.specular_texture_name);
+            if (!specular_texture) specular_texture = globals.white_texture;
+        }
+
+        Texture *normal_texture = globals.white_texture;
+        if (submesh->material.normal_texture_name) {
+            normal_texture = globals.texture_catalog->find_or_load(submesh->material.normal_texture_name);
+            if (!normal_texture) normal_texture = globals.white_texture;
+        }
+        
+        set_texture(TEXTURE_DIFFUSE,  diffuse_texture);
+        set_texture(TEXTURE_SPECULAR, specular_texture);
+        if (submesh->material.normal_texture_name) {
+            set_texture(TEXTURE_NORMAL, normal_texture);
         }
 
         Vector4 diffuse_color = submesh->material.diffuse_color;

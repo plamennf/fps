@@ -1,6 +1,6 @@
 @echo off
 
-set BuildDebug=0
+set BuildDebug=1
 
 if not exist build mkdir build
 pushd build

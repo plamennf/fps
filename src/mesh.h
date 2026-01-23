@@ -9,9 +9,9 @@ struct Texture;
 struct Gpu_Buffer;
 
 struct Material {
-    Texture *diffuse_texture;
-    Texture *specular_texture;
-    Texture *normal_texture;
+    char *diffuse_texture_name;
+    char *specular_texture_name;
+    char *normal_texture_name;
     
     Vector4 diffuse_color;
     float shininess;

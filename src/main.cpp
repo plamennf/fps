@@ -5,8 +5,10 @@
 #include "font.h"
 #include "mesh.h"
 #include "mesh_catalog.h"
+#include "texture_catalog.h"
 #include "entity.h"
 #include "entity_manager.h"
+#include "job_system.h"
 
 #include <SDL3/SDL_main.h>
 #include <GL/glew.h>
@@ -115,6 +117,9 @@ int main(int argc, char *argv[]) {
         SDL_GetCurrentTime(&current_time);
         srand((u32)current_time);
     }
+
+    init_job_system();
+    defer { shutdown_job_system(); };
     
     globals.window_width  = 1280;
     globals.window_height = 720;
@@ -168,6 +173,7 @@ int main(int argc, char *argv[]) {
     init_shaders();
     init_framebuffers();
     
+    globals.texture_catalog = new Texture_Catalog();
     globals.mesh_catalog = new Mesh_Catalog();
     
     init_camera(&globals.camera, v3(0, 2, 0), 0.0f, 0.0f, 0.0f);
@@ -293,6 +299,8 @@ int main(int argc, char *argv[]) {
         
         swap_buffers();
 
+        globals.texture_catalog->update();
+        
         FrameMark;
     }
     

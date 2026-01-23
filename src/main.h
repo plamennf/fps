@@ -21,6 +21,7 @@ const float CAMERA_Z_FAR  = 500.0f;
 struct Mesh;
 struct Framebuffer;
 struct Mesh_Catalog;
+struct Texture_Catalog;
 struct Entity_Manager;
 
 enum Antialiasing_Type {
@@ -109,6 +110,7 @@ struct Global_Variables {
     
     Render_Stage render_stage = RENDER_STAGE_MAIN;
 
+    Texture_Catalog *texture_catalog = NULL;
     Mesh_Catalog *mesh_catalog = NULL;
 
     Entity_Manager *entity_manager = NULL;

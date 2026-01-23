@@ -855,7 +855,7 @@ void refresh_material(Material *material) {
     
     set_vector4(shader->material_color, material->diffuse_color);
     set_float(shader->material_shininess, material->shininess);
-    set_int(shader->material_use_normal_map, material->normal_texture ? 1 : 0);
+    set_int(shader->material_use_normal_map, material->normal_texture_name ? 1 : 0);
 }
 
 void refresh_lights() {
