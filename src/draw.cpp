@@ -199,10 +199,15 @@ static void draw_scene() {
     
     auto manager = globals.entity_manager;
     for (Entity *e : manager->all_entities) {
-        if (e->mesh == NULL) {
+        Mesh *mesh = NULL;
+        if (e->mesh_name) {
+            mesh = globals.mesh_catalog->find_or_load(e->mesh_name);
+        }
+
+        if (mesh == NULL) {
             draw_cube(e->position, e->orientation, e->scale, e->scale_color);
         } else {
-            draw_mesh(e->mesh, e->position, e->orientation, e->scale, e->scale_color);
+            draw_mesh(mesh, e->position, e->orientation, e->scale, e->scale_color);
         }
     }
 

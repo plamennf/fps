@@ -76,6 +76,12 @@ Texture *Texture_Catalog::find_or_load(char *name) {
     entry.cpu = {};
     entry.state = TEXTURE_STATE_LOADING;
 
+    s64 name_length = string_length(name);
+    for (int i = 0; i < name_length; i++) {
+        entry.filepath[i] = name[i];
+    }
+    entry.filepath[name_length] = 0;
+    
     texture_lookup.add(name, entry);
 
     char *extensions[] = {

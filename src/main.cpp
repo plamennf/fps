@@ -103,6 +103,13 @@ static void init_test_world() {
     set_from_axis_and_angle(&zombie_zr, v3(0, 0, 1), 90.0f);
     set_from_axis_and_angle(&zombie_yr, v3(0, 1, 0), 90.0f);
     zombie->orientation = zombie_yr * zombie_zr;
+
+    Entity *knight = make_entity(manager);
+    knight->position = v3(-25.0f, 0, -12.5f);
+    set_from_axis_and_angle(&knight->orientation, v3(0, 1, 0), -60.0f);
+    knight->scale = v3(0.008f);
+    knight->scale_color = v4(1, 1, 1, 1);
+    set_mesh(knight, "knight");
 }
 
 int main(int argc, char *argv[]) {
@@ -300,6 +307,7 @@ int main(int argc, char *argv[]) {
         swap_buffers();
 
         globals.texture_catalog->update();
+        globals.mesh_catalog->update();
         
         FrameMark;
     }

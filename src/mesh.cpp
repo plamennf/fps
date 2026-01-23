@@ -108,8 +108,10 @@ bool load_mesh_gltf(Mesh *mesh, char *filepath) {
                 }
             }
 
+            /*
             submesh->vertex_buffer = make_gpu_buffer(GPU_BUFFER_VERTEX, submesh->num_vertices * sizeof(Mesh_Vertex), submesh->vertices, false);
             submesh->index_buffer = make_gpu_buffer(GPU_BUFFER_INDEX, submesh->num_indices * sizeof(u32), submesh->indices, false);
+            */
             
             if (primitive->material) {
                 cgltf_material *material = primitive->material;
@@ -369,8 +371,10 @@ bool load_mesh_custom(Mesh *mesh, char *filepath) {
         submesh->indices = new u32[submesh->num_indices];
         fread(submesh->indices, sizeof(u32), submesh->num_indices, file);
 
+        /*
         submesh->vertex_buffer = make_gpu_buffer(GPU_BUFFER_VERTEX, submesh->num_vertices * sizeof(Mesh_Vertex), submesh->vertices, false);
         submesh->index_buffer = make_gpu_buffer(GPU_BUFFER_INDEX, submesh->num_indices * sizeof(u32), submesh->indices, false);
+        */
         
         int diffuse_texture_filepath_len = 0;
         fread(&diffuse_texture_filepath_len, sizeof(int), 1, file);

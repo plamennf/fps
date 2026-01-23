@@ -15,7 +15,7 @@ struct Entity {
     Vector3 scale = v3(1, 1, 1);
     Vector4 scale_color = v4(1, 1, 1, 1);
 
-    Mesh *mesh = NULL;
+    char *mesh_name = NULL;
 };
 
 void set_mesh(Entity *entity, char *mesh_name);
