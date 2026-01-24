@@ -1,5 +1,3 @@
-- Add crosshair(make it customizable like CS:GO)
-- Add day/night skyboxes and adjust lights accordingly. Do it with an #ifdef for now. Later can do it as a blend between the two skyboxes in the shader depending on a time value or something like that.
 - Find a 3D image of a city, which i can put as a billboard behind the warehouse, as a background.
 - Make the platform narrower, so it's like a pier.
 - Add extra cubes to make minor adjustments into the pier. In the future maybe just use a map to sample the terrain.
@@ -21,3 +19,5 @@
 - Add ability to show hitboxes.
 - Add ability to add hitboxes.
 - Add ability to scale and move hitboxes. - no rotation
+
+- (C) Add day/night skyboxes and adjust lights accordingly. (C) Do it with an #ifdef for now. (IC) Later can do it as a blend between the two skyboxes in the shader depending on a time value or something like that.

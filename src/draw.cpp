@@ -82,34 +82,6 @@ static void update_shadow_map_cascade_matrices() {
 }
 
 
-static void init_lights() {
-    globals.directional_light.direction = v3(-0.4f, -1.0f, -0.2f);
-    globals.directional_light.ambient   = v3(0.01f, 0.02f, 0.04f);
-    globals.directional_light.diffuse   = v3(0.08f, 0.12f, 0.20f);
-    globals.directional_light.specular  = v3(0.15f, 0.18f, 0.25f);
-    
-    globals.point_lights[0].position  = v3(0.0f, 10.0f, 0.0f);
-    globals.point_lights[0].ambient   = v3(0.02f, 0.015f, 0.01f);
-    globals.point_lights[0].diffuse   = v3(0.8f, 0.65f, 0.45f);
-    globals.point_lights[0].specular  = v3(0.9f, 0.8f, 0.7f);
-    globals.point_lights[0].constant  = 1.0f;
-    globals.point_lights[0].linear    = 0.22f;
-    globals.point_lights[0].quadratic = 0.20f;
-    
-    globals.spot_light    = {};
-    if (globals.flashlight_on) {
-        globals.spot_light.position      = globals.camera.position;
-        globals.spot_light.direction     = globals.camera.target;
-        globals.spot_light.cut_off       = cosf(to_radians(10.0f));
-        globals.spot_light.outer_cut_off = cosf(to_radians(15.0f));
-        globals.spot_light.ambient       = v3(0.0f, 0.0f, 0.0f);
-        globals.spot_light.diffuse       = v3(0.9f, 0.9f, 1.0f);
-        globals.spot_light.specular      = v3(1.0f, 1.0f, 1.0f);
-        globals.spot_light.constant      = 1.0f;
-        globals.spot_light.linear        = 0.07f;
-        globals.spot_light.quadratic     = 0.017f;
-    }
-}
 
 static void draw_hud() {
     set_shader(globals.shader_texture);
@@ -146,6 +118,38 @@ static void draw_hud() {
         x = globals.render_target_width - get_text_width(font, text);
         draw_text(font, text, x, y, v4(1, 1, 1, 1));
     }
+}
+
+static void draw_outlined_quad(Vector2 position, Vector2 size, Vector4 color, float outline_thickness) {
+    if (outline_thickness > 0.0f) {
+        Vector2 outline_size     = size + 2.0f * v2(outline_thickness, outline_thickness);
+        Vector2 outline_position = position - v2(outline_thickness, outline_thickness);
+        immediate_quad(outline_position, outline_size, v4(0, 0, 0, 1));
+    }
+
+    immediate_quad(position, size, color);
+}
+
+static void draw_crosshair() {
+    float size      = 1.0f * 0.01f * (float)globals.window_height;
+    float gap       = 0.5f * 0.01f * (float)globals.window_height;
+    float thickness = 0.2f * 0.01f * (float)globals.window_height;
+    float outline_thicknes = 0.5f * thickness;// * 0.01f * (float)globals.window_height;
+    Vector4 color = v4(1, 1, 0, 1);
+    
+    Vector2 center = v2(globals.window_width * 0.5f, globals.window_height * 0.5f);
+
+    set_shader(globals.shader_color);
+    rendering_2d();
+    
+    immediate_begin();
+    
+    draw_outlined_quad(v2(center.x - 0.5f * thickness, center.y + gap), v2(thickness, size), color, outline_thicknes);
+    draw_outlined_quad(v2(center.x - 0.5f * thickness, center.y - gap - size), v2(thickness, size), color, outline_thicknes);
+    draw_outlined_quad(v2(center.x + gap, center.y - thickness * 0.5f), v2(size, thickness), color, outline_thicknes);
+    draw_outlined_quad(v2(center.x - gap - size, center.y - thickness * 0.5f), v2(size, thickness), color, outline_thicknes);
+
+    immediate_flush();
 }
 
 static void resolve_to_screen(bool clear_back_buffer = true) {
@@ -221,8 +225,6 @@ static void draw_scene() {
 void draw_one_frame() {
     ZoneScoped;
     
-    init_lights();
-    
     // Reset the depth write before clearing as set_depth_write(false) before 2D drawing
     // disables the depth write, which in turn means the depth clear won't work
     set_depth_write(true);
@@ -257,6 +259,7 @@ void draw_one_frame() {
     set_depth_write(false);
     set_cull_face(CULL_FACE_NONE);
     draw_hud();
+    draw_crosshair();
     
     resolve_to_screen(false);
 }

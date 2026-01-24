@@ -17,6 +17,8 @@
 #include <limits.h>
 #include <stdlib.h>
 
+#define DO_DAY
+
 Global_Variables globals = {};
 
 struct Key_State {
@@ -27,6 +29,64 @@ struct Key_State {
 
 static Key_State key_states[SDL_SCANCODE_COUNT];
 static Key_State mouse_buttons[6];
+
+static void init_lights() {
+#ifdef DO_DAY
+    globals.directional_light.direction = v3(-0.981f, -0.196f, 0.0f);
+    globals.directional_light.ambient   = v3(0.2f, 0.1f, 0.05f);
+    globals.directional_light.diffuse   = v3(0.8f, 0.5f, 0.3f);
+    globals.directional_light.specular  = v3(0.5f, 0.3f, 0.3f);
+    
+    globals.point_lights[0].position  = v3(0.0f, 10.0f, 0.0f);
+    globals.point_lights[0].ambient   = v3(0.05f, 0.05f, 0.05f);
+    globals.point_lights[0].diffuse   = v3(1.0f, 0.9f, 0.7f);
+    globals.point_lights[0].specular  = v3(1.0f, 1.0f, 1.0f);
+    globals.point_lights[0].constant  = 1.0f;
+    globals.point_lights[0].linear    = 0.14f;
+    globals.point_lights[0].quadratic = 0.07f;
+    
+    globals.spot_light    = {};
+    if (globals.flashlight_on) {
+        globals.spot_light.position      = globals.camera.position;
+        globals.spot_light.direction     = globals.camera.target;
+        globals.spot_light.cut_off       = cosf(to_radians(12.5f));
+        globals.spot_light.outer_cut_off = cosf(to_radians(17.5f));
+        globals.spot_light.ambient       = v3(0.05f, 0.05f, 0.05f);
+        globals.spot_light.diffuse       = v3(0.8f, 0.8f, 0.8f);
+        globals.spot_light.specular      = v3(1, 1, 1);
+        globals.spot_light.constant      = 1.0f;
+        globals.spot_light.linear        = 0.09f;
+        globals.spot_light.quadratic     = 0.032f;
+    }
+#else
+    globals.directional_light.direction = v3(-0.4f, -1.0f, -0.2f);
+    globals.directional_light.ambient   = v3(0.01f, 0.02f, 0.04f);
+    globals.directional_light.diffuse   = v3(0.08f, 0.12f, 0.20f);
+    globals.directional_light.specular  = v3(0.15f, 0.18f, 0.25f);
+    
+    globals.point_lights[0].position  = v3(0.0f, 10.0f, 0.0f);
+    globals.point_lights[0].ambient   = v3(0.02f, 0.015f, 0.01f);
+    globals.point_lights[0].diffuse   = v3(0.8f, 0.65f, 0.45f);
+    globals.point_lights[0].specular  = v3(0.9f, 0.8f, 0.7f);
+    globals.point_lights[0].constant  = 1.0f;
+    globals.point_lights[0].linear    = 0.22f;
+    globals.point_lights[0].quadratic = 0.20f;
+    
+    globals.spot_light    = {};
+    if (globals.flashlight_on) {
+        globals.spot_light.position      = globals.camera.position;
+        globals.spot_light.direction     = globals.camera.target;
+        globals.spot_light.cut_off       = cosf(to_radians(10.0f));
+        globals.spot_light.outer_cut_off = cosf(to_radians(15.0f));
+        globals.spot_light.ambient       = v3(0.0f, 0.0f, 0.0f);
+        globals.spot_light.diffuse       = v3(0.9f, 0.9f, 1.0f);
+        globals.spot_light.specular      = v3(1.0f, 1.0f, 1.0f);
+        globals.spot_light.constant      = 1.0f;
+        globals.spot_light.linear        = 0.07f;
+        globals.spot_light.quadratic     = 0.017f;
+    }
+#endif
+}
 
 static void toggle_fullscreen() {
     globals.is_fullscreen = !globals.is_fullscreen;
@@ -191,6 +251,16 @@ int main(int argc, char *argv[]) {
     u8 black_texture_data[4] = { 0x00, 0x00, 0x00, 0xFF };
     globals.black_texture = make_texture(1, 1, TEXTURE_FORMAT_RGBA8, black_texture_data);
 
+#ifdef DO_DAY
+    char *skybox_filepaths[6] = {
+        "data/textures/skybox/right.jpg",
+        "data/textures/skybox/left.jpg",
+        "data/textures/skybox/top.jpg",
+        "data/textures/skybox/bottom.jpg",
+        "data/textures/skybox/front.jpg",
+        "data/textures/skybox/back.jpg",
+    };
+#else
     char *skybox_filepaths[6] = {
         "data/textures/night/right.png",
         "data/textures/night/left.png",
@@ -199,6 +269,7 @@ int main(int argc, char *argv[]) {
         "data/textures/night/front.png",
         "data/textures/night/back.png",
     };
+#endif
     globals.skybox = load_cubemap(skybox_filepaths);
 
     globals.entity_manager = new Entity_Manager();
@@ -300,6 +371,7 @@ int main(int argc, char *argv[]) {
             globals.time_info.accumulated_dt -= globals.time_info.fixed_update_dt;
         }
 
+        init_lights();
         draw_one_frame();
 
         do_entity_destruction(globals.entity_manager);
