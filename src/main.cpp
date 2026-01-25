@@ -17,7 +17,7 @@
 #include <limits.h>
 #include <stdlib.h>
 
-#define DO_DAY
+//#define DO_DAY
 
 Global_Variables globals = {};
 
@@ -59,31 +59,31 @@ static void init_lights() {
         globals.spot_light.quadratic     = 0.032f;
     }
 #else
-    globals.directional_light.direction = v3(-0.4f, -1.0f, -0.2f);
-    globals.directional_light.ambient   = v3(0.01f, 0.02f, 0.04f);
-    globals.directional_light.diffuse   = v3(0.08f, 0.12f, 0.20f);
-    globals.directional_light.specular  = v3(0.15f, 0.18f, 0.25f);
+    globals.directional_light.direction = v3(-0.2f, -1.0f, -0.1f);
+    globals.directional_light.ambient   = v3(0.002f, 0.004f, 0.008f);
+    globals.directional_light.diffuse   = v3(0.05f, 0.07f, 0.10f);
+    globals.directional_light.specular  = v3(0.08f, 0.10f, 0.12f);
     
-    globals.point_lights[0].position  = v3(0.0f, 10.0f, 0.0f);
-    globals.point_lights[0].ambient   = v3(0.02f, 0.015f, 0.01f);
-    globals.point_lights[0].diffuse   = v3(0.8f, 0.65f, 0.45f);
-    globals.point_lights[0].specular  = v3(0.9f, 0.8f, 0.7f);
+    globals.point_lights[0].position  = v3(0.0f, 2.0f, -100.0f);
+    globals.point_lights[0].ambient   = v3(0.0f, 0.0f, 0.0f);
+    globals.point_lights[0].diffuse   = v3(0.9f, 0.6f, 0.25f);
+    globals.point_lights[0].specular  = v3(1.0f, 0.8f, 0.5f);
     globals.point_lights[0].constant  = 1.0f;
-    globals.point_lights[0].linear    = 0.22f;
-    globals.point_lights[0].quadratic = 0.20f;
+    globals.point_lights[0].linear    = 0.35f;
+    globals.point_lights[0].quadratic = 0.44f;
     
     globals.spot_light    = {};
     if (globals.flashlight_on) {
         globals.spot_light.position      = globals.camera.position;
         globals.spot_light.direction     = globals.camera.target;
-        globals.spot_light.cut_off       = cosf(to_radians(10.0f));
-        globals.spot_light.outer_cut_off = cosf(to_radians(15.0f));
+        globals.spot_light.cut_off       = cosf(to_radians(8.0f));
+        globals.spot_light.outer_cut_off = cosf(to_radians(12.0f));
         globals.spot_light.ambient       = v3(0.0f, 0.0f, 0.0f);
-        globals.spot_light.diffuse       = v3(0.9f, 0.9f, 1.0f);
-        globals.spot_light.specular      = v3(1.0f, 1.0f, 1.0f);
+        globals.spot_light.diffuse       = v3(1.2f, 1.2f, 1.1f);
+        globals.spot_light.specular      = v3(1.5f, 1.5f, 1.5f);
         globals.spot_light.constant      = 1.0f;
-        globals.spot_light.linear        = 0.07f;
-        globals.spot_light.quadratic     = 0.017f;
+        globals.spot_light.linear        = 0.09f;
+        globals.spot_light.quadratic     = 0.032f;
     }
 #endif
 }
@@ -132,15 +132,123 @@ static void init_test_world() {
     cube->scale       = v3(2, 2, 2);
     cube->scale_color = v4(0, 0, 1, 1);
 
-    Entity *warehouse      = make_entity(manager);
-    warehouse->position    = v3(-25, 0.1f, 0);
-    set_from_axis_and_angle(&warehouse->orientation, v3(1, 0, 0), 90.0f);
-    warehouse->scale       = v3(1);
-    warehouse->scale_color = v4(1, 1, 1, 1);
-    set_mesh(warehouse, "Warehouse");
+    Entity *crypt      = make_entity(manager);
+    crypt->position    = v3(0, 0.1f, -100.0f);
+    set_from_axis_and_angle(&crypt->orientation, v3(0, 0, 0), 0.0f);
+    crypt->scale       = v3(5);
+    crypt->scale_color = v4(1, 1, 1, 1);
+    set_mesh(crypt, "crypt-large");
+
+    Entity *crypt_roof      = make_entity(manager);
+    crypt_roof->position    = crypt->position + v3(0, 4.9f, 0);
+    crypt_roof->scale       = v3(5);
+    crypt_roof->scale_color = v4(1, 1, 1, 1);
+    set_mesh(crypt_roof, "crypt-large-roof");
+
+    // To the left of the crypt
+    {
+        Entity *wall      = make_entity(manager);
+        wall->position    = v3(-5.0f, 0.0f, -94.0f);
+        wall->scale       = v3(2);
+        wall->scale_color = v4(1, 1, 1, 1);
+        set_mesh(wall, "brick-wall");
+    }
+    for (float x = -96.5f; x < -5.0f; x += 3.0f) {
+        Entity *wall      = make_entity(manager);
+        wall->position    = v3(x, 0.0f, -94.0f);
+        wall->scale       = v3(3, 2, 2);
+        wall->scale_color = v4(1, 1, 1, 1);
+        set_mesh(wall, "brick-wall");
+    }
+    {
+        Entity *wall      = make_entity(manager);
+        wall->position    = v3(-99.0f, 0.0f, -94.0f);
+        wall->scale       = v3(2);
+        wall->scale_color = v4(1, 1, 1, 1);
+        set_from_axis_and_angle(&wall->orientation, v3(0, 1, 0), -90.0f);
+        set_mesh(wall, "brick-wall-curve");
+    }
+
+    // To the right of the crypt
+    {
+        Entity *wall      = make_entity(manager);
+        wall->position    = v3(+5.0f, 0.0f, -94.0f);
+        wall->scale       = v3(2);
+        wall->scale_color = v4(1, 1, 1, 1);
+        set_mesh(wall, "brick-wall");
+    }
+    for (float x = 96.5f; x > 5.0f; x -= 3.0f) {
+        Entity *wall      = make_entity(manager);
+        wall->position    = v3(x, 0.0f, -94.0f);
+        wall->scale       = v3(3, 2, 2);
+        wall->scale_color = v4(1, 1, 1, 1);
+        set_mesh(wall, "brick-wall");
+    }
+    {
+        Entity *wall      = make_entity(manager);
+        wall->position    = v3(99.0f, 0.0f, -94.0f);
+        wall->scale       = v3(2);
+        wall->scale_color = v4(1, 1, 1, 1);
+        //set_from_axis_and_angle(&wall->orientation, v3(0, 1, 0), -90.0f);
+        set_mesh(wall, "brick-wall-curve");
+    }
+
+    // Left side
+    for (float z = 97.0f; z > -95.0f; z -= 3.0f) {
+        Entity *wall      = make_entity(manager);
+        wall->position    = v3(-99.0f, 0.0f, z);
+        wall->scale       = v3(2, 2, 3);
+        wall->scale_color = v4(1, 1, 1, 1);
+        set_from_axis_and_angle(&wall->orientation, v3(0, 1, 0), -90.0f);
+        set_mesh(wall, "brick-wall");
+    }
+    {
+        Entity *wall      = make_entity(manager);
+        wall->position    = v3(-99.0f, 0.0f, 99.0f);
+        wall->scale       = v3(2);
+        wall->scale_color = v4(1, 1, 1, 1);
+        set_from_axis_and_angle(&wall->orientation, v3(0, 1, 0), 180.0f);
+        set_mesh(wall, "brick-wall-curve");
+    }
+
+    // Right side
+    for (float z = 97.0f; z > -95.0f; z -= 3.0f) {
+        Entity *wall      = make_entity(manager);
+        wall->position    = v3(99.0f, 0.0f, z);
+        wall->scale       = v3(2, 2, 3);
+        wall->scale_color = v4(1, 1, 1, 1);
+        set_from_axis_and_angle(&wall->orientation, v3(0, 1, 0), 90.0f);
+        set_mesh(wall, "brick-wall");
+    }
+    {
+        Entity *wall      = make_entity(manager);
+        wall->position    = v3(99.0f, 0.0f, 99.0f);
+        wall->scale       = v3(2);
+        wall->scale_color = v4(1, 1, 1, 1);
+        set_from_axis_and_angle(&wall->orientation, v3(0, 1, 0), 90.0f);
+        set_mesh(wall, "brick-wall-curve");
+    }
+
+    // Behind
+    for (float x = -97.0f; x < 98.0f; x += 3.0f) {
+        Entity *wall      = make_entity(manager);
+        wall->position    = v3(x, 0, 99.0f);
+        wall->scale       = v3(3, 2, 2);
+        wall->scale_color = v4(1, 1, 1, 1);
+        set_from_axis_and_angle(&wall->orientation, v3(0, 1, 0), 180.0f);
+        set_mesh(wall, "brick-wall");
+    }
+    {
+        Entity *wall      = make_entity(manager);
+        wall->position    = v3(97.0f, 0.0f, 99.0f);
+        wall->scale       = v3(2);
+        wall->scale_color = v4(1, 1, 1, 1);
+        set_from_axis_and_angle(&wall->orientation, v3(0, 1, 0), 180.0f);
+        set_mesh(wall, "brick-wall");
+    }
     
     Entity *demon = make_entity(manager);
-    demon->position    = v3(0, 0, -25);
+    demon->position    = v3(0, 0, -20);
     set_from_axis_and_angle(&demon->orientation, v3(0, 1, 0), -90.0f);
     demon->scale       = v3(1, 1, 1);
     demon->scale_color = v4(100, 0, 0, 1);
@@ -154,7 +262,7 @@ static void init_test_world() {
     set_mesh(birb, "Birb");
 
     Entity *zombie      = make_entity(manager);
-    zombie->position    = v3(25, 0, 0);
+    zombie->position    = v3(20, 0, 0);
     zombie->scale       = v3(0.013f);
     zombie->scale_color = v4(1, 1, 1, 1);
     set_mesh(zombie, "Zombie");

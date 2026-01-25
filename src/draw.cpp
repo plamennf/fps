@@ -70,7 +70,6 @@ static void update_shadow_map_cascade_matrices() {
         Matrix4 light_proj = make_orthographic(-s, s, -s, s, 0.1f, 1000.0f);
 
         Vector3 light_eye = camera_position - (light_direction * 500.0f);
-        //Vector3 light_eye = light_direction * -500.0f;
 
         Vector3 world_up = (fabsf(light_direction.y) > 0.99f) ? v3(0, 0, 1) : v3(0, 1, 0);
 
@@ -80,8 +79,6 @@ static void update_shadow_map_cascade_matrices() {
     
     refresh_csm();
 }
-
-
 
 static void draw_hud() {
     set_shader(globals.shader_texture);
@@ -194,7 +191,7 @@ void rendering_3d_shadow_map(int cascade_index) {
 static void draw_scene() {
     ZoneScoped;
 
-    draw_cube(v3(0, -1, 0), Quaternion(), v3(200, 2.0f, 200.0f), v4(0, 1, 0, 1));
+    draw_cube(v3(0, -1, 0), Quaternion(), v3(200, 2.0f, 200), v4(0.07f, 0.09f, 0.06f, 1.0f));
 
     /*
     Mesh *mesh = globals.mesh_catalog->find_or_load("knight");
@@ -214,12 +211,6 @@ static void draw_scene() {
             draw_mesh(mesh, e->position, e->orientation, e->scale, e->scale_color);
         }
     }
-
-#if 0
-    draw_cube(v3(1, 1, -25), v3(0, 0, 0), v3(2, 2, 2), v4(0, 0, 1, 1));
-    draw_mesh(globals.mesh, v3(0, 0, -50), v3(0, 90, 0), 1.0f);
-    //draw_mesh(globals.mesh, v3(0, 0, -50), v3(0, 0, 0), 0.01f);
-#endif
 }
 
 void draw_one_frame() {

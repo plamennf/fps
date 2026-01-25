@@ -1,7 +1,5 @@
-- Find a 3D image of a city, which i can put as a billboard behind the warehouse, as a background.
-- Make the platform narrower, so it's like a pier.
-- Add extra cubes to make minor adjustments into the pier. In the future maybe just use a map to sample the terrain.
-- Add realistic infinite water(like ocean) behind the pier.
+- I am going to use Kenney graveyard pack to make it into a gravesite with a crypt from which zombies will pop out and attack you.
+
 - Add skeletal animation.
 
 - Add menu.

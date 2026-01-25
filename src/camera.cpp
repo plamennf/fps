@@ -63,6 +63,12 @@ void update_camera_fps(Camera *camera) {
 
     camera->target.y = sinf(to_radians(camera->pitch));
     camera->target   = normalize_or_zero(camera->target);
+
+    if (camera->position.x < -99.0f) camera->position.x = -99.0f;
+    if (camera->position.x > +99.0f) camera->position.x = +99.0f;
+
+    if (camera->position.z < -94.0f) camera->position.z = -94.0f;
+    if (camera->position.z > +99.0f) camera->position.z = +99.0f;
 }
 
 void fixed_update_camera_fps(Camera *camera) {
@@ -78,7 +84,7 @@ void fixed_update_camera_fps(Camera *camera) {
     camera->jump_velocity -= 1.0f * dt;
 
     camera->position.y += camera->jump_velocity;
-
+    
     if (camera->position.y < 2.0f) {
         camera->position.y = 2.0f;
         camera->is_on_ground = true;

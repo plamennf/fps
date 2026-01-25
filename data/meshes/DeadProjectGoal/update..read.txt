@@ -1,0 +1,10 @@
+two new characters,mutants.
+ch1.blend / model+texture+animations(3)
+ch2.blend/  model+texture+animations(3)
+
+playground.blend / both new mutants coded ,and my player version for testing.[press 1,2,3 to shift weapons]
+
+new sound files/die,attack,hit sounds for mutants
+
+
+the game ready mutants are found on playground file, under layer 2.

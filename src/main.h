@@ -89,7 +89,7 @@ struct Global_Variables {
     Texture *skybox = NULL;
     
     Matrix4 shadow_map_cascade_matrices[NUM_SHADOW_MAP_CASCADES] = {};
-    float shadow_map_cascade_splits[NUM_SHADOW_MAP_CASCADES] = { 30.0f, 100.0f, 200.0f, 400.0f };
+    float shadow_map_cascade_splits[NUM_SHADOW_MAP_CASCADES] = { 3.0f, 10.0f, 40.0f, 200.0f };
     
     Shader *shader_color = NULL;
     Shader *shader_texture = NULL;
