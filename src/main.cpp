@@ -9,6 +9,7 @@
 #include "entity.h"
 #include "entity_manager.h"
 #include "job_system.h"
+#include "console.h"
 
 #include <SDL3/SDL_main.h>
 #include <GL/glew.h>
@@ -447,16 +448,22 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        if (is_key_pressed(SDL_SCANCODE_ESCAPE)) {
-            globals.should_show_cursor = !globals.should_show_cursor;
-        }
-
         if (is_key_pressed(SDL_SCANCODE_F11)) {
             toggle_fullscreen();
         }
 
         if (is_key_pressed(SDL_SCANCODE_N)) {
             toggle_noclip();
+        }
+
+        if (is_key_pressed(SDL_SCANCODE_F1 /*GRAVE*/)) {
+            toggle_console();
+        }
+
+        if (!is_console_open()) {
+            if (is_key_pressed(SDL_SCANCODE_ESCAPE)) {
+                globals.should_show_cursor = !globals.should_show_cursor;
+            }
         }
         
         if (globals.should_show_cursor) {
@@ -481,6 +488,7 @@ int main(int argc, char *argv[]) {
 
         init_lights();
         draw_one_frame();
+        draw_console(globals.time_info.dt);
 
         do_entity_destruction(globals.entity_manager);
         
