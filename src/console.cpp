@@ -1,6 +1,12 @@
 #include "main.h"
 #include "console.h"
 #include "draw.h"
+#include "font.h"
+
+// TODO:
+// - Add scrolling to the console history
+// - Add text input and draw it
+// - Add commands
 
 enum Console_State {
     CONSOLE_STATE_CLOSED,
@@ -11,6 +17,14 @@ static Console_State current_state = CONSOLE_STATE_CLOSED;
 static float openness_t        = 0.0f;
 static float openness_t_max    = 0.4f;
 static float openness_t_target = 0.0f;
+
+static Array <char *> console_history;
+
+static void add_string_to_history(char *_s) {
+    char *s = copy_string(_s);
+    // s = sanitize(s);
+    console_history.add(s);
+}
 
 void toggle_console() {
     if (current_state == CONSOLE_STATE_OPEN) {
@@ -25,6 +39,12 @@ void toggle_console() {
 }
 
 void draw_console(float dt) {
+    if (console_history.count <= 0) {
+        add_string_to_history("noclip");
+        add_string_to_history("godmode");
+        add_string_to_history("crosshair_size 3");
+    }
+    
     float console_change_speed = 1.0f;
     openness_t = move_toward(openness_t, openness_t_target, console_change_speed * dt);
 
@@ -50,6 +70,16 @@ void draw_console(float dt) {
     immediate_begin();
     immediate_quad(v2(0, globals.window_height - history_part - text_input_part), v2((float)globals.window_width, text_input_part), v4(21/255.0f, 34/255.0f, 56/255.0f, 1.0f));
     immediate_flush();
+
+    int history_font_size = (int)(0.035f * globals.window_height);
+    Font *history_font = get_font_at_size("data/fonts/LiberationMono-Regular.ttf", history_font_size);
+    float y = globals.window_height - history_part;
+    
+    for (int i = console_history.count - 1; i >= 0; i--) {
+        char *text = console_history[i];
+        draw_text(history_font, text, 0, (int)(y + history_font->y_offset_for_centering), v4(1, 1, 1, 1));
+        y += history_font->character_height;
+    }
 }
 
 bool is_console_open() {
