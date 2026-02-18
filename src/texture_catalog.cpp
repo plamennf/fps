@@ -6,6 +6,7 @@
 
 #include <stdio.h>
 #include <stb_image.h>
+#include <tracy/Tracy.hpp>
 
 #define TEXTURE_DIRECTORY "data/textures"
 
@@ -116,6 +117,8 @@ Texture *Texture_Catalog::find_or_load(char *name) {
 }
 
 void Texture_Catalog::update() {
+    ZoneScopedN("Texture Catalog Update");
+    
     for (int i = 0; i < texture_lookup.allocated; i++) {
         if (!texture_lookup.occupancy_mask[i]) continue;
 

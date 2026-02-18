@@ -51,7 +51,7 @@ void init_renderer(SDL_Window *_window) {
     immediate_init();
 
     GLuint vao;
-    glGenVertexArrays(1, &vao);
+    glCreateVertexArrays(1, &vao);
     glBindVertexArray(vao);
 
     glEnable(GL_FRAMEBUFFER_SRGB);

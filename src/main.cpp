@@ -18,6 +18,12 @@
 #include <limits.h>
 #include <stdlib.h>
 
+extern "C" 
+{
+    __declspec(dllexport) unsigned long NvOptimusEnablement = 0x00000001;
+    __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
+}
+
 //#define DO_DAY
 
 Global_Variables globals = {};
@@ -32,6 +38,8 @@ static Key_State key_states[SDL_SCANCODE_COUNT];
 static Key_State mouse_buttons[6];
 
 static void init_lights() {
+    ZoneScopedN("Init Lights");
+    
 #ifdef DO_DAY
     globals.directional_light.direction = v3(-0.981f, -0.196f, 0.0f);
     globals.directional_light.ambient   = v3(0.2f, 0.1f, 0.05f);
@@ -92,6 +100,8 @@ static void init_lights() {
 static void toggle_fullscreen() {
     globals.is_fullscreen = !globals.is_fullscreen;
     SDL_SetWindowFullscreen(globals.window, globals.is_fullscreen);
+
+    SDL_GL_SetSwapInterval(0);
 }
 
 static void toggle_noclip() {
@@ -486,16 +496,28 @@ int main(int argc, char *argv[]) {
             globals.time_info.accumulated_dt -= globals.time_info.fixed_update_dt;
         }
 
-        init_lights();
-        draw_one_frame();
-        draw_console(globals.time_info.dt);
+        {
+            ZoneScopedN("Render frame");
+            init_lights();
+            draw_one_frame();
+            draw_console(globals.time_info.dt);
+        }
 
-        do_entity_destruction(globals.entity_manager);
-        
-        swap_buffers();
+        {
+            ZoneScopedN("Do Entity Destruction");
+            do_entity_destruction(globals.entity_manager);
+        }
 
-        globals.texture_catalog->update();
-        globals.mesh_catalog->update();
+        {
+            ZoneScopedN("Swap Buffers");
+            swap_buffers();
+        }
+
+        {
+            ZoneScopedN("Resource Catalog Updates");
+            globals.texture_catalog->update();
+            globals.mesh_catalog->update();
+        }
         
         FrameMark;
     }

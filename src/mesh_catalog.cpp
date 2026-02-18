@@ -6,6 +6,7 @@
 #include "job_system.h"
 
 #include <stdio.h>
+#include <tracy/Tracy.hpp>
 
 #define MESH_DIRECTORY "data/meshes"
 
@@ -90,6 +91,8 @@ static void upload_mesh_buffers_to_gpu(Mesh *mesh) {
 }
 
 void Mesh_Catalog::update() {
+    ZoneScopedN("Texture Catalog Update");
+    
     for (int i = 0; i < mesh_lookup.allocated; i++) {
         if (!mesh_lookup.occupancy_mask[i]) continue;
 

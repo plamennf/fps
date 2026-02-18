@@ -150,6 +150,8 @@ static void draw_crosshair() {
 }
 
 static void resolve_to_screen(bool clear_back_buffer = true) {
+    ZoneScoped;
+    
     set_framebuffer(NULL, clear_back_buffer, v4(0, 0, 0, 1), false, 1.0f, false, 0);
     rendering_2d();
 
@@ -221,36 +223,50 @@ void draw_one_frame() {
     set_depth_write(true);
     
     // Shadows Drawing:
-    globals.render_stage = RENDER_STAGE_SHADOW;
-    update_shadow_map_cascade_matrices();
-    for (int i = 0; i < NUM_SHADOW_MAP_CASCADES; i++) {
-        set_framebuffer(shadow_map_cascade_buffers[i], false, v4(0, 0, 0, 0), true, 1.0f, false, 0);
-        rendering_3d_shadow_map(i);
-        draw_scene();
+    {
+        ZoneScopedN("Shadow pass");
+        globals.render_stage = RENDER_STAGE_SHADOW;
+        update_shadow_map_cascade_matrices();
+        for (int i = 0; i < NUM_SHADOW_MAP_CASCADES; i++) {
+            ZoneScopedN("Single shadow pass");
+            set_framebuffer(shadow_map_cascade_buffers[i], false, v4(0, 0, 0, 0), true, 1.0f, false, 0);
+            rendering_3d_shadow_map(i);
+            draw_scene();
+        }
     }
-    
-    // Normal 3D Drawing:
-    set_framebuffer(offscreen_buffer, true, v4(0.2f, 0.5f, 0.8f, 1.0f), true, 1.0f, false, 0);
-    globals.render_stage = RENDER_STAGE_MAIN;
-    rendering_3d();
-    draw_scene();
-    resolve_to_screen();
 
-    set_framebuffer(offscreen_buffer, false, v4(0, 0, 0, 1), false, 1.0f, false, 0);
-    // Skybox Drawing:
-    rendering_3d();
-    set_depth_write(false);
-    set_cull_face(CULL_FACE_FRONT);
-    set_shader(globals.shader_skybox);
-    set_cube_map(globals.skybox);
-    draw_cube(v3(0, 0, 0), Quaternion(), v3(2, 2, 2), v4(1, 1, 1, 1));
-    set_shader(NULL);
-    
-    // 2D Drawing:
-    set_depth_write(false);
-    set_cull_face(CULL_FACE_NONE);
-    draw_hud();
-    draw_crosshair();
+    {
+        ZoneScopedN("Main pass");
+        // Normal 3D Drawing:
+        set_framebuffer(offscreen_buffer, true, v4(0.2f, 0.5f, 0.8f, 1.0f), true, 1.0f, false, 0);
+        globals.render_stage = RENDER_STAGE_MAIN;
+        rendering_3d();
+        draw_scene();
+        resolve_to_screen();
+    }
+
+    {
+        ZoneScopedN("Skybox pass");
+        set_framebuffer(offscreen_buffer, false, v4(0, 0, 0, 1), false, 1.0f, false, 0);
+        // Skybox Drawing:
+        rendering_3d();
+        set_depth_write(false);
+        set_cull_face(CULL_FACE_FRONT);
+        set_shader(globals.shader_skybox);
+        set_cube_map(globals.skybox);
+        draw_cube(v3(0, 0, 0), Quaternion(), v3(2, 2, 2), v4(1, 1, 1, 1));
+        set_shader(NULL);
+    }
+
+    {
+        ZoneScoped("2D UI pass");
+        
+        // 2D Drawing:
+        set_depth_write(false);
+        set_cull_face(CULL_FACE_NONE);
+        draw_hud();
+        draw_crosshair();
+    }
     
     resolve_to_screen(false);
 }
