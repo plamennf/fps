@@ -1128,67 +1128,11 @@ void Render_Backend::image_layout_transition(VkCommandBuffer buffer, VkImage ima
     image_layout_transition(buffer, image, src_stage_mask, dst_stage_mask, src_access_mask, dst_access_mask, old_layout, new_layout, subresource_range);
 }
 
-bool Render_Backend::create_vertex_buffer(Gpu_Buffer *buffer, VkDeviceSize size, void *initial_data) {
+bool Render_Backend::create_buffer(Gpu_Buffer *buffer, VkBufferUsageFlagBits buffer_type, VkDeviceSize size, void *initial_data) {
     VkBufferCreateInfo buffer_create_info = {};
     buffer_create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     buffer_create_info.size  = size;
-    buffer_create_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-
-    VmaAllocationCreateInfo buffer_allocation_create_info = {};
-    buffer_allocation_create_info.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_ALLOW_TRANSFER_INSTEAD_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
-    buffer_allocation_create_info.usage = VMA_MEMORY_USAGE_AUTO;
-
-    if (vmaCreateBuffer(allocator, &buffer_create_info, &buffer_allocation_create_info, &buffer->buffer, &buffer->allocation, NULL) != VK_SUCCESS) {
-        logprintf("Failed to allocate vulkan vertex buffer!\n");
-        return false;
-    }
-
-    buffer->size = size;
-
-    void *mapped_buffer_data = NULL;
-    if (vmaMapMemory(allocator, buffer->allocation, &mapped_buffer_data)) {
-        logprintf("Failed to map vulkan buffer!\n");
-        return false;
-    }
-    memcpy(mapped_buffer_data, initial_data, size);
-    vmaUnmapMemory(allocator, buffer->allocation);
-
-    return true;
-}
-
-bool Render_Backend::create_index_buffer(Gpu_Buffer *buffer, VkDeviceSize size, void *initial_data) {
-    VkBufferCreateInfo buffer_create_info = {};
-    buffer_create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    buffer_create_info.size  = size;
-    buffer_create_info.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-
-    VmaAllocationCreateInfo buffer_allocation_create_info = {};
-    buffer_allocation_create_info.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_ALLOW_TRANSFER_INSTEAD_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
-    buffer_allocation_create_info.usage = VMA_MEMORY_USAGE_AUTO;
-
-    if (vmaCreateBuffer(allocator, &buffer_create_info, &buffer_allocation_create_info, &buffer->buffer, &buffer->allocation, NULL) != VK_SUCCESS) {
-        logprintf("Failed to allocate vulkan index buffer!\n");
-        return false;
-    }
-
-    buffer->size = size;
-
-    void *mapped_buffer_data = NULL;
-    if (vmaMapMemory(allocator, buffer->allocation, &mapped_buffer_data)) {
-        logprintf("Failed to map index buffer!\n");
-        return false;
-    }
-    memcpy(mapped_buffer_data, initial_data, size);
-    vmaUnmapMemory(allocator, buffer->allocation);
-
-    return true;
-}
-
-bool Render_Backend::create_uniform_buffer(Gpu_Buffer *buffer, VkDeviceSize size, void *initial_data) {
-    VkBufferCreateInfo buffer_create_info = {};
-    buffer_create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    buffer_create_info.size  = size;
-    buffer_create_info.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+    buffer_create_info.usage = buffer_type;
     
     VmaAllocationCreateInfo buffer_allocation_create_info = {};
     buffer_allocation_create_info.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_ALLOW_TRANSFER_INSTEAD_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;

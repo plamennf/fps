@@ -39,7 +39,7 @@ bool Scene_Renderer::init(Render_Backend *_backend) {
     }
 
     for (int i = 0; i < Render_Backend::MAX_FRAMES_IN_FLIGHT; i++) {
-        if (!backend->create_uniform_buffer(&per_scene_uniform_buffers[i], sizeof(Per_Scene_Uniforms), NULL)) {
+        if (!backend->create_buffer(&per_scene_uniform_buffers[i], VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT , sizeof(Per_Scene_Uniforms), NULL)) {
             return false;
         }
 
@@ -301,8 +301,8 @@ void Scene_Renderer::add_render_entity(Mesh *mesh, glm::vec3 position, glm::vec3
 void Scene_Renderer::generate_gpu_data_for_submesh(Submesh *submesh) {
     MyZoneScopedN("Generate gpu data for submesh");
     
-    if (!backend->create_vertex_buffer(&submesh->vertex_buffer, submesh->num_vertices * sizeof(Mesh_Vertex), submesh->vertices)) return;
-    if (!backend->create_index_buffer(&submesh->index_buffer, submesh->num_indices * sizeof(u32), submesh->indices)) return;
+    if (!backend->create_buffer(&submesh->vertex_buffer, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, submesh->num_vertices * sizeof(Mesh_Vertex), submesh->vertices)) return;
+    if (!backend->create_buffer(&submesh->index_buffer, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, submesh->num_indices * sizeof(u32), submesh->indices)) return;
     
     submesh->material.albedo_texture = globals.white_texture;
     if (submesh->material.albedo_texture_name) {
@@ -336,7 +336,7 @@ void Scene_Renderer::generate_gpu_data_for_submesh(Submesh *submesh) {
     material_uniforms.emissive_factor = submesh->material.emissive_factor;
     material_uniforms.uses_specular_glossiness = submesh->material.uses_specular_glossiness ? 1 : 0;
     
-    if (!backend->create_uniform_buffer(&submesh->material.uniform_buffer, sizeof(Material_Uniforms), &material_uniforms)) return;
+    if (!backend->create_buffer(&submesh->material.uniform_buffer, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, sizeof(Material_Uniforms), &material_uniforms)) return;
     
     if (!backend->create_descriptor_sets(material_uniforms_descriptor_pool, material_uniforms_descriptor_set_layout, 1, &submesh->material.descriptor_set)) return;
     

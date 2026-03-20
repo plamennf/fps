@@ -108,9 +108,7 @@ struct Render_Backend {
     inline VkExtent2D get_swap_chain_extent() { return swap_chain_extent; }
     inline VkFormat get_swap_chain_surface_format() { return swap_chain_surface_format.format; };
     
-    bool create_vertex_buffer(Gpu_Buffer *buffer, VkDeviceSize size, void *initial_data);
-    bool create_index_buffer(Gpu_Buffer *buffer, VkDeviceSize size, void *initial_data);
-    bool create_uniform_buffer(Gpu_Buffer *buffer, VkDeviceSize size, void *initial_data);
+    bool create_buffer(Gpu_Buffer *buffer, VkBufferUsageFlagBits buffer_type, VkDeviceSize size, void *initial_data);
     bool update_buffer(Gpu_Buffer *buffer, VkDeviceSize offset, VkDeviceSize size, void *data);
     void destroy_buffer(Gpu_Buffer *buffer);
 
