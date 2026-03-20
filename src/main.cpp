@@ -6,6 +6,7 @@
 #include "renderer/mesh_registry.h"
 
 #include <SDL.h>
+#include <imgui_impl_sdl2.h>
 
 Global_Variables globals;
 
@@ -113,6 +114,8 @@ int main(int argc, char *argv[]) {
 #if defined(BUILD_RELEASE) || defined(BUILD_DIST)
     start_fullscreen = true;
 #endif
+
+    start_fullscreen = true;
     
     globals.window_width  = -1;
     globals.window_height = -1;
@@ -161,6 +164,8 @@ int main(int argc, char *argv[]) {
     }
     defer { globals.render_backend->device_wait_idle(); };
 
+    globals.render_backend->imgui_init();
+    
     globals.scene_renderer = new Scene_Renderer();
     if (!globals.scene_renderer->init(globals.render_backend)) {
         return 1;
@@ -184,6 +189,10 @@ int main(int argc, char *argv[]) {
 
     SDL_SetRelativeMouseMode(SDL_TRUE);
 
+    if (start_fullscreen) {
+        toggle_fullscreen(globals.window);
+    }
+    
     float accumulated_dt = 0.0f;
     float fixed_update_dt = 1.0f / 60.0f;
     init_camera(&globals.camera, glm::vec3(0, 2, 0), 0, 0, 0);
@@ -204,6 +213,8 @@ int main(int argc, char *argv[]) {
         
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
+            ImGui_ImplSDL2_ProcessEvent(&event);
+            
             switch (event.type) {
                 case SDL_QUIT: {
                     globals.should_quit = true;
@@ -280,6 +291,8 @@ int main(int argc, char *argv[]) {
         }
 
         if (globals.window_width > 0 && globals.window_height > 0) {
+            MyZoneScopedN("Render one frame");
+            
             if (!globals.render_backend->begin_frame()) {
                 return 1;
             }
@@ -374,7 +387,7 @@ int main(int argc, char *argv[]) {
             globals.scene_renderer->add_render_entity(mesh, {0, 0, 10}, {0, 0, 0}, glm::vec3(scale), glm::vec4(1));
         
             globals.scene_renderer->render();
-
+            
             if (vkEndCommandBuffer(cb) != VK_SUCCESS) {
                 logprintf("Failed to record command buffer!\n");
                 return 1;
@@ -384,6 +397,8 @@ int main(int argc, char *argv[]) {
                 //return 1;
             }
         }
+
+        MyFrameMark;
     }
     
     return 0;

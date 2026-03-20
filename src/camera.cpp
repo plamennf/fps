@@ -84,7 +84,7 @@ void fixed_update_camera_fps(Camera *camera, float dt) {
 }
 
 void update_camera_noclip(Camera *camera, float dt) {
-    float sensitivity = globals.mouse_sensitivity;
+    float sensitivity = globals.mouse_sensitivity * dt;
     
     camera->yaw   += globals.mouse_cursor_x_delta * sensitivity;
     camera->pitch += globals.mouse_cursor_y_delta * sensitivity;

@@ -47,42 +47,6 @@ bool Scene_Renderer::init(Render_Backend *_backend) {
     }
 
     //
-    // Create per object uniforms vulkan objects
-    //
-    VkDescriptorPoolSize per_object_uniforms_pool_sizes[1] = {};
-
-    per_object_uniforms_pool_sizes[0].type            = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    per_object_uniforms_pool_sizes[0].descriptorCount = MAX_RENDER_ENTITIES * Render_Backend::MAX_FRAMES_IN_FLIGHT;
-
-    if (!backend->create_descriptor_pool(&per_object_uniforms_descriptor_pool, ArrayCount(per_object_uniforms_pool_sizes), per_object_uniforms_pool_sizes, MAX_RENDER_ENTITIES * Render_Backend::MAX_FRAMES_IN_FLIGHT)) {
-        return false;
-    }
-    
-    VkDescriptorSetLayoutBinding per_object_uniforms_descriptor_set_layout_bindings[1] = {};
-
-    per_object_uniforms_descriptor_set_layout_bindings[0].descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    per_object_uniforms_descriptor_set_layout_bindings[0].descriptorCount = 1;
-    per_object_uniforms_descriptor_set_layout_bindings[0].stageFlags      = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-
-    if (!backend->create_descriptor_set_layout(&per_object_uniforms_descriptor_set_layout, ArrayCount(per_object_uniforms_descriptor_set_layout_bindings), per_object_uniforms_descriptor_set_layout_bindings)) {
-        return false;
-    }
-
-    per_object_uniforms_descriptor_sets = new VkDescriptorSet[MAX_RENDER_ENTITIES * Render_Backend::MAX_FRAMES_IN_FLIGHT];
-    if (!backend->create_descriptor_sets(per_object_uniforms_descriptor_pool, per_object_uniforms_descriptor_set_layout, MAX_RENDER_ENTITIES * Render_Backend::MAX_FRAMES_IN_FLIGHT, per_object_uniforms_descriptor_sets)) {
-        return false;
-    }
-
-    per_object_uniform_buffers = new Gpu_Buffer[MAX_RENDER_ENTITIES * Render_Backend::MAX_FRAMES_IN_FLIGHT];
-    for (int i = 0; i < MAX_RENDER_ENTITIES * Render_Backend::MAX_FRAMES_IN_FLIGHT; i++) {
-        if (!backend->create_uniform_buffer(&per_object_uniform_buffers[i], sizeof(Per_Object_Uniforms), NULL)) {
-            return false;
-        }
-
-        backend->update_descriptor_set(per_object_uniforms_descriptor_sets[i], 0, &per_object_uniform_buffers[i]);
-    }
-
-    //
     // Create material uniforms vulkan objects
     //
     int max_submeshes_per_render_entity = 8;
@@ -117,22 +81,26 @@ bool Scene_Renderer::init(Render_Backend *_backend) {
         return false;
     }
 
+    VkPushConstantRange per_object_push_constant_range = {};
+    per_object_push_constant_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    per_object_push_constant_range.offset = 0;
+    per_object_push_constant_range.size = sizeof(Per_Object_Uniforms);
+    
     VkDescriptorSetLayout mesh_descriptor_set_layouts[] = {
         per_scene_uniforms_descriptor_set_layout,
-        per_object_uniforms_descriptor_set_layout,
         material_uniforms_descriptor_set_layout,
     };
-    if (!backend->create_graphics_pipeline_layout(ArrayCount(mesh_descriptor_set_layouts), mesh_descriptor_set_layouts, &mesh_pipeline_layout)) {
+    if (!backend->create_graphics_pipeline_layout(ArrayCount(mesh_descriptor_set_layouts), mesh_descriptor_set_layouts, 1, &per_object_push_constant_range, &mesh_pipeline_layout)) {
         return false;
     }
-
+    
     Graphics_Pipeline_Info mesh_pipepline_info = {};
-
+    
     mesh_pipepline_info.pipeline_layout = mesh_pipeline_layout;
     mesh_pipepline_info.shader_filename = "basic";
     mesh_pipepline_info.vertex_type     = RENDER_VERTEX_MESH;
     mesh_pipepline_info.blend_mode      = BLEND_MODE_OFF;
-    mesh_pipepline_info.cull_mode       = CULL_MODE_NONE;
+    mesh_pipepline_info.cull_mode       = CULL_MODE_BACK;
     mesh_pipepline_info.depth_test_mode = DEPTH_TEST_MODE_LEQUAL;
     mesh_pipepline_info.depth_write     = true;
     
@@ -161,6 +129,8 @@ bool Scene_Renderer::init_framebuffers() {
 }
 
 void Scene_Renderer::render() {
+    MyZoneScopedN("Scene_Renderer::render");
+    
     VkCommandBuffer cb = backend->get_current_command_buffer(false);
     
     VkImageSubresourceRange color_range = {};
@@ -231,10 +201,16 @@ void Scene_Renderer::render() {
 
     per_scene_uniforms.camera_position   = camera.position;
     
-    backend->update_buffer(&per_scene_uniform_buffers[backend->current_frame], sizeof(per_scene_uniforms), &per_scene_uniforms);
+    backend->update_buffer(&per_scene_uniform_buffers[backend->current_frame], 0, sizeof(per_scene_uniforms), &per_scene_uniforms);
     //backend->update_descriptor_set(per_scene_uniforms_descriptor_sets[backend->current_frame], 0, &per_scene_uniform_buffers[backend->current_frame]);
+
+    vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh_pipeline);
+
+    vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh_pipeline_layout, 0, 1, &per_scene_uniforms_descriptor_sets[backend->current_frame], 0, NULL);
     
     for (int i = 0; i < render_entities.size(); i++) {
+        MyZoneScopedN("Draw single mesh");
+        
         auto const &entity = render_entities[i];
 
         Per_Object_Uniforms per_object_uniforms = {};
@@ -242,9 +218,7 @@ void Scene_Renderer::render() {
         per_object_uniforms.world_matrix = entity.world_matrix;
         per_object_uniforms.scale_color  = entity.scale_color;
         
-        int current_index = i * Render_Backend::MAX_FRAMES_IN_FLIGHT + backend->current_frame;
-        backend->update_buffer(&per_object_uniform_buffers[current_index], sizeof(Per_Object_Uniforms), &per_object_uniforms);
-        //update_descriptor_set(&per_object_uniforms_descriptor_sets, 0, &per_object_uniform_buffers[current_index]);
+        vkCmdPushConstants(cb, mesh_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(Per_Object_Uniforms), &per_object_uniforms);
         
         Mesh *mesh = entity.mesh;
         for (int i = 0; i < mesh->num_submeshes; i++) {
@@ -254,11 +228,9 @@ void Scene_Renderer::render() {
                 if (!submesh->has_gpu_data) continue;
             }
 
-            vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh_pipeline);
-
-            vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh_pipeline_layout, 0, 1, &per_scene_uniforms_descriptor_sets[backend->current_frame], 0, NULL);
-            vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh_pipeline_layout, 1, 1, &per_object_uniforms_descriptor_sets[current_index], 0, NULL);
-            vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh_pipeline_layout, 2, 1, &submesh->material.descriptor_set, 0, NULL);
+            MyZoneScopedN("Draw one submesh");
+            
+            vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh_pipeline_layout, 1, 1, &submesh->material.descriptor_set, 0, NULL);
 
             VkDeviceSize offset = 0;
             vkCmdBindVertexBuffers(cb, 0, 1, &submesh->vertex_buffer.buffer, &offset);
@@ -268,6 +240,26 @@ void Scene_Renderer::render() {
         }
     }
     
+    // TODO: Move this out of here eventually. It's here because it needs to be between vkCmdBeginRendering and vkCmdEndRendering
+    {
+        MyZoneScopedN("ImGui Rendering");
+        static float current_dt = 1.0f;
+        static int frame_counter = 0;
+
+        frame_counter++;
+        if (frame_counter > 30) {
+            current_dt = (float)globals.time_info.delta_time_seconds;
+            frame_counter = 0;
+        }
+        
+        globals.render_backend->imgui_begin_frame();
+        ImGui::Begin("Stats");
+        ImGui::Text("FPS: %d", (int)(1.0f / current_dt));
+        ImGui::Text("Frame time: %.2fms", current_dt * 1000.0f);
+        ImGui::End();
+        globals.render_backend->imgui_end_frame(cb);
+    }
+
     vkCmdEndRendering(cb);
 
     backend->image_layout_transition(cb, backend->get_current_swap_chain_image(), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, color_range);
@@ -307,6 +299,8 @@ void Scene_Renderer::add_render_entity(Mesh *mesh, glm::vec3 position, glm::vec3
 }
 
 void Scene_Renderer::generate_gpu_data_for_submesh(Submesh *submesh) {
+    MyZoneScopedN("Generate gpu data for submesh");
+    
     if (!backend->create_vertex_buffer(&submesh->vertex_buffer, submesh->num_vertices * sizeof(Mesh_Vertex), submesh->vertices)) return;
     if (!backend->create_index_buffer(&submesh->index_buffer, submesh->num_indices * sizeof(u32), submesh->indices)) return;
     

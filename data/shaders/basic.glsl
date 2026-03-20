@@ -19,17 +19,13 @@ layout(location = 6) COMM vec3 world_position;
 
 struct Light {
     int type;
-    int _padding0[3];
     vec3 position;
-    float _padding1;
     vec3 direction;
-    float _padding2;
     vec3 color;
     float intensity;
     float range;
     float spot_inner_cone_angle;
     float spot_outer_cone_angle;
-    float _padding3;
 };
 
 layout(set = 0, binding = 0) uniform Per_Scene {
@@ -40,17 +36,11 @@ layout(set = 0, binding = 0) uniform Per_Scene {
     float _padding;
 } per_scene;
 
-layout(set = 1, binding = 0) uniform Per_Object {
-    mat4 world;
-    vec4 scale_color;
-} per_object;
-
-layout(set = 2, binding = 0) uniform Material {
+layout(set = 1, binding = 0) uniform Material {
     vec4 albedo_factor;
-    int has_normal_map;
     vec3 emissive_factor;
     int uses_specular_glossiness;
-    float _padding0[3];
+    int has_normal_map;
 } material;
 
 #ifdef VERTEX_SHADER
@@ -62,9 +52,14 @@ layout(location = 3) in vec3 in_normal;
 layout(location = 4) in vec3 in_tangent;
 layout(location = 5) in vec3 in_bitangent;
 
+layout(push_constant) uniform Per_Object {
+    mat4 world;
+    vec4 scale_color;
+} per_object;
+
 void main() {
-    frag_uv = in_uv;
-    frag_color = in_color;
+    frag_uv = vec2(in_uv.x, 1.0 - in_uv.y);
+    frag_color = in_color * per_object.scale_color;
     
     gl_Position = per_scene.projection * per_scene.view * per_object.world * vec4(in_position, 1.0);
 
@@ -84,11 +79,11 @@ void main() {
 
 layout(location = 0) out vec4 output_color;
 
-layout(set = 2, binding = 1) uniform sampler2D albedo_texture;
-layout(set = 2, binding = 2) uniform sampler2D normal_texture;
-layout(set = 2, binding = 3) uniform sampler2D metallic_roughness_texture;
-layout(set = 2, binding = 4) uniform sampler2D ao_texture;
-layout(set = 2, binding = 5) uniform sampler2D emissive_texture;
+layout(set = 1, binding = 1) uniform sampler2D albedo_texture;
+layout(set = 1, binding = 2) uniform sampler2D normal_texture;
+layout(set = 1, binding = 3) uniform sampler2D metallic_roughness_texture;
+layout(set = 1, binding = 4) uniform sampler2D ao_texture;
+layout(set = 1, binding = 5) uniform sampler2D emissive_texture;
 
 float distribution_ggx(vec3 N, vec3 H, float roughness) {
     float a      = roughness * roughness;
@@ -128,7 +123,7 @@ vec3 fresnel_schlick(float cos_theta, vec3 F0) {
 
 void main() {
     vec4 full_albedo = texture(albedo_texture, frag_uv);
-    vec3 albedo      = full_albedo.rgb * material.albedo_factor.xyz * frag_color.rgb * per_object.scale_color.rgb;
+    vec3 albedo      = full_albedo.rgb * material.albedo_factor.xyz * frag_color.rgb;
 
     vec3 normal      = world_normal;
 

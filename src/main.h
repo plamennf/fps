@@ -47,7 +47,7 @@ struct Global_Variables {
     
     Camera camera;
     bool flashlight_on = false;
-    float mouse_sensitivity = 0.2f;
+    float mouse_sensitivity = 1.0f;
     bool should_show_cursor = false;
 };
 

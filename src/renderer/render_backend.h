@@ -40,6 +40,7 @@ struct Swap_Chain_Support_Details {
 struct Gpu_Buffer {
     VkBuffer buffer = VK_NULL_HANDLE;
     VmaAllocation allocation = {};
+    VmaAllocationInfo allocation_info = {};
     VkDeviceSize size = 0;
 };
 
@@ -110,7 +111,7 @@ struct Render_Backend {
     bool create_vertex_buffer(Gpu_Buffer *buffer, VkDeviceSize size, void *initial_data);
     bool create_index_buffer(Gpu_Buffer *buffer, VkDeviceSize size, void *initial_data);
     bool create_uniform_buffer(Gpu_Buffer *buffer, VkDeviceSize size, void *initial_data);
-    bool update_buffer(Gpu_Buffer *buffer, VkDeviceSize size, void *data);
+    bool update_buffer(Gpu_Buffer *buffer, VkDeviceSize offset, VkDeviceSize size, void *data);
     void destroy_buffer(Gpu_Buffer *buffer);
 
     bool create_descriptor_set_layout(VkDescriptorSetLayout *layout, int num_descriptor_layout_bindings, VkDescriptorSetLayoutBinding *descriptor_layout_bindings);
@@ -120,7 +121,7 @@ struct Render_Backend {
     void update_descriptor_set(VkDescriptorSet set, int binding_slot, Texture *texture);
     
     VkShaderModule create_shader_module(s64 code_size, const char *code);
-    bool create_graphics_pipeline_layout(int num_descriptor_set_layouts, VkDescriptorSetLayout *descriptor_set_layouts, VkPipelineLayout *result);
+    bool create_graphics_pipeline_layout(int num_descriptor_set_layouts, VkDescriptorSetLayout *descriptor_set_layouts, int num_push_constant_ranges, VkPushConstantRange *push_constant_ranges, VkPipelineLayout *result);
     bool create_graphics_pipeline(Graphics_Pipeline_Info info, VkPipeline *result);
     bool recreate_swap_chain();
     
@@ -129,6 +130,10 @@ struct Render_Backend {
 
     bool create_depth_buffer(Texture *texture, int width, int height, VkFormat format);
     void destroy_texture(Texture *texture);
+
+    void imgui_init();
+    void imgui_begin_frame();
+    void imgui_end_frame(VkCommandBuffer cb);
     
 private:
     bool create_instance();
@@ -155,6 +160,7 @@ private:
     VkPresentModeKHR choose_swap_present_mode(int num_available_present_modes, VkPresentModeKHR *available_present_modes);
     VkExtent2D choose_swap_extent(SDL_Window *window, VkSurfaceCapabilitiesKHR capabilities);
     bool is_device_suitable(VkPhysicalDevice device);
+    int rate_device_suitability(VkPhysicalDevice device);
     
 private:
     SDL_Window *window;

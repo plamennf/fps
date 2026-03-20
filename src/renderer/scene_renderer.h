@@ -43,12 +43,13 @@ struct Per_Object_Uniforms {
     glm::mat4 world_matrix;
     glm::vec4 scale_color;
 };
+static_assert(sizeof(Per_Object_Uniforms) % 80 == 0, "Per_Object_Uniforms has mismatched size");
 
 struct Material_Uniforms {
     glm::vec4 albedo_factor;
-    int has_normal_map;
     glm::vec3 emissive_factor;
     int uses_specular_glossiness;
+    int has_normal_map;
 };
 
 struct Render_Entity {
@@ -87,11 +88,6 @@ private:
     VkDescriptorSetLayout per_scene_uniforms_descriptor_set_layout;
     VkDescriptorSet per_scene_uniforms_descriptor_sets[Render_Backend::MAX_FRAMES_IN_FLIGHT];
     Gpu_Buffer per_scene_uniform_buffers[Render_Backend::MAX_FRAMES_IN_FLIGHT];
-    
-    VkDescriptorPool per_object_uniforms_descriptor_pool;
-    VkDescriptorSetLayout per_object_uniforms_descriptor_set_layout;
-    VkDescriptorSet *per_object_uniforms_descriptor_sets;
-    Gpu_Buffer *per_object_uniform_buffers;
     
     VkDescriptorPool material_uniforms_descriptor_pool;
     VkDescriptorSetLayout material_uniforms_descriptor_set_layout;

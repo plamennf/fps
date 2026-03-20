@@ -5,6 +5,8 @@
 #include <SDL.h>
 #include <SDL_vulkan.h>
 #include <vulkan/vulkan.h>
+#include <imgui_impl_sdl2.h>
+#include <imgui_impl_vulkan.h>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
@@ -46,9 +48,12 @@ bool Render_Backend::init(SDL_Window *_window) {
 
     extensions = new const char *[num_extensions];
     memcpy(extensions, sdl_extensions, num_sdl_extensions * sizeof(const char *));
-    extensions[num_extensions - 2] = VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME;
+    
     if (validation_layers) {
         extensions[num_extensions - 1] = VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
+        extensions[num_extensions - 2] = VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME;
+    } else {
+        extensions[num_extensions - 1] = VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME;
     }
 
     num_device_extensions = 2;
@@ -365,6 +370,31 @@ bool Render_Backend::is_device_suitable(VkPhysicalDevice device) {
     return indices.has_graphics_family && indices.has_present_family && extensions_supported && swap_chain_adequate;
 }
 
+int Render_Backend::rate_device_suitability(VkPhysicalDevice device) {
+    VkPhysicalDeviceProperties properties;
+    vkGetPhysicalDeviceProperties(device, &properties);
+    VkPhysicalDeviceFeatures features;
+    vkGetPhysicalDeviceFeatures(device, &features);
+
+    if (!is_device_suitable(device)) {
+        return 0;
+    }
+
+    int score = 0;
+
+    if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
+        score += 1000;
+    }
+
+    if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU) {
+        score += 100;
+    }
+
+    score += properties.limits.maxImageDimension2D;
+
+    return score;
+}
+
 bool Render_Backend::select_physical_device() {
     u32 num_devices = 0;
     vkEnumeratePhysicalDevices(instance, &num_devices, 0);
@@ -378,11 +408,15 @@ bool Render_Backend::select_physical_device() {
     defer { delete[] devices; };
     vkEnumeratePhysicalDevices(instance, &num_devices, devices);
 
+    int best_score = -1;
+    
     for (u32 i = 0; i < num_devices; i++) {
         VkPhysicalDevice device = devices[i];
-        if (is_device_suitable(device)) {
-            physical_device = device;
-            break;
+
+        int score = rate_device_suitability(device);
+        if (score > best_score) {
+            best_score = score;
+            physical_device = devices[i];
         }
     }
 
@@ -567,13 +601,13 @@ VkShaderModule Render_Backend::create_shader_module(s64 code_size, const char *c
     return shader_module;
 }
 
-bool Render_Backend::create_graphics_pipeline_layout(int num_descriptor_set_layouts, VkDescriptorSetLayout *descriptor_set_layouts, VkPipelineLayout *result) {
+bool Render_Backend::create_graphics_pipeline_layout(int num_descriptor_set_layouts, VkDescriptorSetLayout *descriptor_set_layouts, int num_push_constant_ranges, VkPushConstantRange *push_constant_ranges, VkPipelineLayout *result) {
     VkPipelineLayoutCreateInfo pipeline_layout_info = {};
     pipeline_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipeline_layout_info.setLayoutCount = num_descriptor_set_layouts;
     pipeline_layout_info.pSetLayouts = descriptor_set_layouts;
-    pipeline_layout_info.pushConstantRangeCount = 0;
-    pipeline_layout_info.pPushConstantRanges = 0;
+    pipeline_layout_info.pushConstantRangeCount = num_push_constant_ranges;
+    pipeline_layout_info.pPushConstantRanges = push_constant_ranges;
 
     if (vkCreatePipelineLayout(device, &pipeline_layout_info, 0, result) != VK_SUCCESS) {
         logprintf("Failed to create pipeline layout!\n");
@@ -599,7 +633,7 @@ bool Render_Backend::create_graphics_pipeline(Graphics_Pipeline_Info info, VkPip
     snprintf(frag_filepath, sizeof(frag_filepath), "data/shaders/compiled/%s.frag.spv", info.shader_filename);
     
     s64 frag_shader_code_size = 0;
-    const char *frag_shader_code = read_entire_file("data/shaders/compiled/basic.frag.spv", &frag_shader_code_size);
+    const char *frag_shader_code = read_entire_file(frag_filepath, &frag_shader_code_size);
     if (!frag_shader_code) {
         logprintf("Failed to read file '%s'.\n", frag_filepath);
         return false;
@@ -936,6 +970,8 @@ bool Render_Backend::recreate_swap_chain() {
 }
 
 bool Render_Backend::begin_frame() {
+    MyZoneScopedN("Render_Backend::begin_frame");
+    
     vkWaitForFences(device, 1, &in_flight_fences[current_frame], VK_TRUE, UINT64_MAX);
     vkResetFences(device, 1, &in_flight_fences[current_frame]);
     
@@ -949,6 +985,8 @@ bool Render_Backend::begin_frame() {
 }
 
 bool Render_Backend::end_frame() {
+    MyZoneScopedN("Render_Backend::end_frame");
+    
     VkSubmitInfo submit_info = {};
     submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
@@ -1151,12 +1189,12 @@ bool Render_Backend::create_uniform_buffer(Gpu_Buffer *buffer, VkDeviceSize size
     buffer_create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     buffer_create_info.size  = size;
     buffer_create_info.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-
+    
     VmaAllocationCreateInfo buffer_allocation_create_info = {};
     buffer_allocation_create_info.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_ALLOW_TRANSFER_INSTEAD_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
     buffer_allocation_create_info.usage = VMA_MEMORY_USAGE_AUTO;
 
-    if (vmaCreateBuffer(allocator, &buffer_create_info, &buffer_allocation_create_info, &buffer->buffer, &buffer->allocation, NULL) != VK_SUCCESS) {
+    if (vmaCreateBuffer(allocator, &buffer_create_info, &buffer_allocation_create_info, &buffer->buffer, &buffer->allocation, &buffer->allocation_info) != VK_SUCCESS) {
         logprintf("Failed to allocate vulkan uniform buffer!\n");
         return false;
     }
@@ -1164,26 +1202,14 @@ bool Render_Backend::create_uniform_buffer(Gpu_Buffer *buffer, VkDeviceSize size
     buffer->size = size;
 
     if (initial_data) {
-        void *mapped_buffer_data = NULL;
-        if (vmaMapMemory(allocator, buffer->allocation, &mapped_buffer_data)) {
-            logprintf("Failed to map uniform buffer!\n");
-            return false;
-        }
-        memcpy(mapped_buffer_data, initial_data, size);
-        vmaUnmapMemory(allocator, buffer->allocation);
+        update_buffer(buffer, 0, size, initial_data);
     }
         
     return true;
 }
 
-bool Render_Backend::update_buffer(Gpu_Buffer *buffer, VkDeviceSize size, void *data) {
-    void *mapped_buffer_data = NULL;
-    if (vmaMapMemory(allocator, buffer->allocation, &mapped_buffer_data)) {
-        logprintf("Failed to map uniform buffer!\n");
-        return false;
-    }
-    memcpy(mapped_buffer_data, data, size);
-    vmaUnmapMemory(allocator, buffer->allocation);
+bool Render_Backend::update_buffer(Gpu_Buffer *buffer, VkDeviceSize offset, VkDeviceSize size, void *data) {
+    memcpy((u8 *)buffer->allocation_info.pMappedData + offset, data, size);
 
     return true;
 }
@@ -1496,4 +1522,71 @@ void Render_Backend::destroy_texture(Texture *texture) {
         vkDestroySampler(device, texture->sampler, NULL);
         texture->sampler = VK_NULL_HANDLE;
     }
+}
+
+void Render_Backend::imgui_init() {
+    VkDescriptorPoolSize pool_sizes[] = { { VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
+		{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
+		{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
+		{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
+		{ VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
+		{ VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
+		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
+		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
+		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
+		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
+		{ VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 } };
+
+	VkDescriptorPoolCreateInfo pool_info = {};
+	pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+	pool_info.maxSets = 1000;
+	pool_info.poolSizeCount = ArrayCount(pool_sizes);
+	pool_info.pPoolSizes = pool_sizes;
+
+	VkDescriptorPool imgui_pool;
+    if (vkCreateDescriptorPool(device, &pool_info, NULL, &imgui_pool) != VK_SUCCESS) {
+        logprintf("Failed to create imgui descriptor pool!\n");
+    }
+
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+
+    ImGui::StyleColorsDark();
+
+    ImGui_ImplSDL2_InitForVulkan(window);
+    
+    ImGui_ImplVulkan_InitInfo init_info = {};
+    init_info.ApiVersion = VK_API_VERSION_1_3;
+    init_info.Instance = instance;
+    init_info.PhysicalDevice = physical_device;
+    init_info.Device = device;
+    init_info.QueueFamily = queue_family_indices.graphics_family;
+    init_info.Queue = graphics_queue;
+    init_info.DescriptorPool = imgui_pool;
+    init_info.MinImageCount = 2;
+    init_info.ImageCount = 2;
+    init_info.UseDynamicRendering = true;
+    init_info.PipelineInfoMain.PipelineRenderingCreateInfo = {.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};
+	init_info.PipelineInfoMain.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
+	init_info.PipelineInfoMain.PipelineRenderingCreateInfo.pColorAttachmentFormats = &swap_chain_surface_format.format;
+	init_info.PipelineInfoMain.PipelineRenderingCreateInfo.depthAttachmentFormat = VK_FORMAT_D32_SFLOAT;
+    init_info.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+    //init_info.CheckVkResultFn = check_vk_result;
+    ImGui_ImplVulkan_Init(&init_info);
+
+    //ImGui_ImplVulkan_CreateFontsTexture();
+}
+
+void Render_Backend::imgui_begin_frame() {
+    ImGui_ImplVulkan_NewFrame();
+    ImGui_ImplSDL2_NewFrame();
+    ImGui::NewFrame();
+}
+
+void Render_Backend::imgui_end_frame(VkCommandBuffer cb) {
+    ImGui::Render();
+    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cb);
 }

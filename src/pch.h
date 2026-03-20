@@ -11,6 +11,18 @@
 #include <eastl/string.h>
 #include <eastl/sort.h>
 #include "memory_arena.h"
+#include <imgui.h>
+
+#ifdef TRACY_ENABLE
+#include <tracy/Tracy.hpp>
+#define MyZoneScopedN ZoneScopedN
+#define MyZoneScoped ZoneScoped
+#define MyFrameMark  FrameMark
+#else
+#define MyZoneScopedN
+#define MyZoneScoped
+#define MyFrameMark
+#endif
 
 #define NS_PER_SECOND 1000000000.0
 
@@ -29,3 +41,4 @@ namespace glm {
     }
     
 }
+
