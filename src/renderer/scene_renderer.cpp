@@ -221,12 +221,16 @@ void Scene_Renderer::render() {
     float aspect_ratio = extent.width / (extent.height > 0 ? (float)extent.height : 1.0f);
     glm::mat4 projection_matrix = glm::perspective(glm::radians(90.0f), aspect_ratio, 0.1f, 1000.0f);
     projection_matrix[1][1] *= -1;
-    glm::mat4 view_matrix = glm::mat4(1.0f);
+    glm::mat4 view_matrix = get_view_matrix(&camera);
 
     Per_Scene_Uniforms per_scene_uniforms;
     per_scene_uniforms.projection_matrix = projection_matrix;
     per_scene_uniforms.view_matrix       = view_matrix;
 
+    memcpy(per_scene_uniforms.lights, lights, MAX_LIGHTS * sizeof(Light));
+
+    per_scene_uniforms.camera_position   = camera.position;
+    
     backend->update_buffer(&per_scene_uniform_buffers[backend->current_frame], sizeof(per_scene_uniforms), &per_scene_uniforms);
     //backend->update_descriptor_set(per_scene_uniforms_descriptor_sets[backend->current_frame], 0, &per_scene_uniform_buffers[backend->current_frame]);
     
@@ -269,6 +273,20 @@ void Scene_Renderer::render() {
     backend->image_layout_transition(cb, backend->get_current_swap_chain_image(), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, color_range);
 
     render_entities.clear();
+    num_lights = 0;
+}
+
+void Scene_Renderer::set_camera(Camera _camera) {
+    camera = _camera;
+}
+
+void Scene_Renderer::add_light(Light light) {
+    if (num_lights >= MAX_LIGHTS) {
+        logprintf("You are trying to add too many lights! The max is: %d\n", MAX_LIGHTS);
+        return;
+    }
+
+    lights[num_lights++] = light;
 }
 
 void Scene_Renderer::add_render_entity(Mesh *mesh, glm::vec3 position, glm::vec3 rotation, glm::vec3 scale, glm::vec4 scale_color) {
@@ -291,8 +309,6 @@ void Scene_Renderer::add_render_entity(Mesh *mesh, glm::vec3 position, glm::vec3
 void Scene_Renderer::generate_gpu_data_for_submesh(Submesh *submesh) {
     if (!backend->create_vertex_buffer(&submesh->vertex_buffer, submesh->num_vertices * sizeof(Mesh_Vertex), submesh->vertices)) return;
     if (!backend->create_index_buffer(&submesh->index_buffer, submesh->num_indices * sizeof(u32), submesh->indices)) return;
-    if (!backend->create_uniform_buffer(&submesh->material.uniform_buffer, sizeof(Material), &submesh->material)) return;
-    if (!backend->create_descriptor_sets(material_uniforms_descriptor_pool, material_uniforms_descriptor_set_layout, 1, &submesh->material.descriptor_set)) return;
     
     submesh->material.albedo_texture = globals.white_texture;
     if (submesh->material.albedo_texture_name) {
@@ -318,6 +334,17 @@ void Scene_Renderer::generate_gpu_data_for_submesh(Submesh *submesh) {
     if (submesh->material.emissive_texture_name) {
         submesh->material.emissive_texture = globals.texture_registry->find_or_load(submesh->material.emissive_texture_name);
     }
+
+    Material_Uniforms material_uniforms;
+
+    material_uniforms.albedo_factor   = submesh->material.albedo_factor;
+    material_uniforms.has_normal_map  = submesh->material.normal_texture && submesh->material.normal_texture != globals.white_texture;
+    material_uniforms.emissive_factor = submesh->material.emissive_factor;
+    material_uniforms.uses_specular_glossiness = submesh->material.uses_specular_glossiness ? 1 : 0;
+    
+    if (!backend->create_uniform_buffer(&submesh->material.uniform_buffer, sizeof(Material_Uniforms), &material_uniforms)) return;
+    
+    if (!backend->create_descriptor_sets(material_uniforms_descriptor_pool, material_uniforms_descriptor_set_layout, 1, &submesh->material.descriptor_set)) return;
     
     backend->update_descriptor_set(submesh->material.descriptor_set, 0, &submesh->material.uniform_buffer);
     backend->update_descriptor_set(submesh->material.descriptor_set, 1, submesh->material.albedo_texture);

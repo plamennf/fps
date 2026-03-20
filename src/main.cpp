@@ -9,6 +9,9 @@
 
 Global_Variables globals;
 
+//static glm::vec3 directional_light_direction = glm::vec3(0, -1, 0); // Noon
+static glm::vec3 directional_light_direction = glm::vec3(-0.5f, -0.2f, 0); // Early morning
+
 struct Key_State {
     bool is_down;
     bool was_down;
@@ -170,8 +173,20 @@ int main(int argc, char *argv[]) {
     globals.white_texture = new Texture();
     if (!globals.render_backend->create_texture(globals.white_texture, 1, 1, VK_FORMAT_R8G8B8A8_SRGB, white_texture_data, "white_texture")) return 1;
     
-    Mesh *mesh = globals.mesh_registry->find_or_load("Cube");
-    
+    Mesh *building = globals.mesh_registry->find_or_load("Victorian");
+    if (!building) return 1;
+
+    Mesh *cube = globals.mesh_registry->find_or_load("Cube");
+    if (!cube) return 1;
+
+    Mesh *mesh = globals.mesh_registry->find_or_load("Zoro");
+    if (!mesh) return 1;
+
+    SDL_SetRelativeMouseMode(SDL_TRUE);
+
+    float accumulated_dt = 0.0f;
+    float fixed_update_dt = 1.0f / 60.0f;
+    init_camera(&globals.camera, glm::vec3(0, 2, 0), 0, 0, 0);
     while (!globals.should_quit) {
         globals.frame_memory.reset();
         update_time();
@@ -182,6 +197,9 @@ int main(int argc, char *argv[]) {
             state->changed   = false;
         }
 
+        globals.mouse_cursor_x_delta = 0.0f;
+        globals.mouse_cursor_y_delta = 0.0f;
+        
         bool was_resized = false;
         
         SDL_Event event;
@@ -217,7 +235,36 @@ int main(int argc, char *argv[]) {
                         } break;
                     }
                 }
+
+                case SDL_MOUSEMOTION: {
+                    globals.mouse_cursor_x_delta = (float)event.motion.xrel;
+                    globals.mouse_cursor_y_delta = -(float)event.motion.yrel;
+                } break;
             }
+        }
+
+        if (is_key_pressed(SDL_SCANCODE_ESCAPE)) {
+            globals.should_show_cursor = !globals.should_show_cursor;
+        }
+        
+        if (!globals.should_show_cursor) {
+            SDL_SetRelativeMouseMode(SDL_TRUE);
+        } else {
+            SDL_SetRelativeMouseMode(SDL_FALSE);
+        }
+
+        float dt = (float)globals.time_info.delta_time_seconds;
+        accumulated_dt += dt;
+        
+        if (!globals.should_show_cursor) {
+            update_camera(&globals.camera, CAMERA_TYPE_FPS, dt);
+        }
+        
+        while (accumulated_dt >= fixed_update_dt) {
+            if (!globals.should_show_cursor) {
+                fixed_update_camera(&globals.camera, CAMERA_TYPE_FPS, fixed_update_dt);
+            }
+            accumulated_dt -= fixed_update_dt;
         }
 
         if (was_resized) {
@@ -246,9 +293,85 @@ int main(int argc, char *argv[]) {
                 return 1;
             }
 
-            globals.scene_renderer->add_render_entity(mesh, {0, 0, -5}, {0, 45, 0}, {1, 1, 1}, {1, 0.5f, 0.2f, 1});
-            globals.scene_renderer->add_render_entity(mesh, {-4.5f, 0, -5}, {0, 45, 0}, {1, 1, 1}, {1, 0.5f, 0.2f, 1});
-            globals.scene_renderer->add_render_entity(mesh, {+4.5f, 0, -5}, {0, 45, 0}, {1, 1, 1}, {1, 0.5f, 0.2f, 1});
+            Light sun = {};
+            sun.type      = LIGHT_TYPE_DIRECTIONAL;
+            sun.direction = glm::normalize_or_zero(directional_light_direction);
+            sun.color     = glm::vec3(1.0f, 0.95f, 0.85f);
+            sun.intensity = 1.2f;
+            //sun.intensity = 10.0f;
+    
+            Light l0 = {};
+            l0.type = LIGHT_TYPE_POINT;
+            l0.position = glm::vec3(0.0f, 32.0f, 0.0f);
+            l0.color = glm::vec3(1.0f, 0.85f, 0.7f);
+            l0.intensity = 8.0f;
+            l0.range = 60.0f;
+
+            Light l1 = {};
+            l1.type = LIGHT_TYPE_POINT;
+            l1.position = glm::vec3(-30.0f, 15.0f, 0.0f);
+            l1.color = glm::vec3(0.4f, 0.6f, 1.0f);
+            l1.intensity = 4.0f;
+            l1.range = 45.0f;
+
+            Light l2 = {};
+            l2.type = LIGHT_TYPE_POINT;
+            l2.position = glm::vec3(30.0f, 12.0f, -10.0f);
+            l2.color = glm::vec3(1.0f, 1.0f, 1.0f);
+            l2.intensity = 10.0f;
+            l2.range = 40.0f;
+
+            Light l3 = {};
+            l3.type = LIGHT_TYPE_POINT;
+            l3.position = glm::vec3(0.0f, 10.0f, -25.0f);
+            l3.color = glm::vec3(1.0f, 0.95f, 0.8f);
+            l3.intensity = 3.0f;
+            l3.range = 50.0f;
+
+            Light l4 = {};
+            l4.type = LIGHT_TYPE_POINT;
+            l4.position = glm::vec3(-15.0f, 10.0f, 20.0f);
+            l4.color = glm::vec3(0.6f, 0.7f, 1.0f);
+            l4.intensity = 4.0f;
+            l4.range = 35.0f;
+
+            Light l5 = {};
+            l5.type = LIGHT_TYPE_POINT;
+            l5.position = glm::vec3(20.0f, 18.0f, 10.0f);
+            l5.color = glm::vec3(1.0f, 0.9f, 0.75f);
+            l5.intensity = 5.0f;
+            l5.range = 40.0f;
+
+            Light spot_light = {};
+            if (globals.flashlight_on) {
+                spot_light.type      = LIGHT_TYPE_SPOT;
+                spot_light.position  = globals.camera.position;
+                spot_light.direction = glm::normalize_or_zero(globals.camera.target);
+                spot_light.color     = glm::vec3(1.0f, 1.0f, 0.9f);
+                spot_light.intensity = 800.0f;
+                spot_light.range     = 50.0f;
+                spot_light.spot_inner_cone_angle = cosf(glm::radians(12.5f));
+                spot_light.spot_outer_cone_angle = cosf(glm::radians(20.0f));
+            }
+
+            globals.scene_renderer->set_camera(globals.camera);
+            
+            globals.scene_renderer->add_light(sun);
+            globals.scene_renderer->add_light(l0);
+            globals.scene_renderer->add_light(l1);
+            globals.scene_renderer->add_light(l2);
+            globals.scene_renderer->add_light(l3);
+            globals.scene_renderer->add_light(l4);
+            globals.scene_renderer->add_light(l5);
+            globals.scene_renderer->add_light(spot_light);
+            
+            globals.scene_renderer->add_render_entity(cube, {-50, -1, -50}, {0, 0, 0}, {100, 1, 100}, {1, 1, 1, 1});
+
+            float scale = 10.0f;
+            globals.scene_renderer->add_render_entity(building, {0, 0.1f, -10}, {0, 0, 0}, glm::vec3(scale), glm::vec4(1));
+
+            scale = 1.0f;
+            globals.scene_renderer->add_render_entity(mesh, {0, 0, 10}, {0, 0, 0}, glm::vec3(scale), glm::vec4(1));
         
             globals.scene_renderer->render();
 

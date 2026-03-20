@@ -1,5 +1,7 @@
 #pragma once
 
+#include "camera.h"
+
 struct SDL_Window;
 struct Render_Backend;
 struct Scene_Renderer;
@@ -39,6 +41,14 @@ struct Global_Variables {
     Mesh_Registry *mesh_registry = NULL;
     
     Texture *white_texture = NULL;
+
+    float mouse_cursor_x_delta = 0.0f;
+    float mouse_cursor_y_delta = 0.0f;
+    
+    Camera camera;
+    bool flashlight_on = false;
+    float mouse_sensitivity = 0.2f;
+    bool should_show_cursor = false;
 };
 
 extern Global_Variables globals;
