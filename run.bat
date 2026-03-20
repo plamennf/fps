@@ -1,5 +1,5 @@
 @echo off
 
 REM build\Debug\fps.exe
-REM build\Release\fps.exe
-build\Dist\fps.exe
+build\Release\fps.exe
+REM build\Dist\fps.exe

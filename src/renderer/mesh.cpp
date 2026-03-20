@@ -93,7 +93,7 @@ bool load_mesh_gltf(Mesh *mesh, char *filepath) {
         glm::mat4 matrix;
         for (int y = 0; y < 4; y++) {
             for (int x = 0; x < 4; x++) {
-                matrix[x][y] = fmatrix[y * 4 + x];
+                matrix[x][y] = fmatrix[x * 4 + y];
             }
         }
         

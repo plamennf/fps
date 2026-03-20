@@ -19,7 +19,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(VkDebugUtilsMessageSever
 bool Render_Backend::init(SDL_Window *_window) {
     window = _window;
 
-#if defined(BUILD_DEBUG) || defined(BUILD_RELEASE)
+#ifdef BUILD_DEBUG
     validation_layers_enabled = true;
 #else
     validation_layers_enabled = false;
@@ -1555,6 +1555,12 @@ void Render_Backend::imgui_init() {
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
     ImGui::StyleColorsDark();
+
+    float main_scale = ImGui_ImplSDL2_GetContentScaleForDisplay(0);
+    
+    ImGuiStyle &style = ImGui::GetStyle();
+    style.ScaleAllSizes(main_scale);
+    style.FontScaleDpi = main_scale;
 
     ImGui_ImplSDL2_InitForVulkan(window);
     

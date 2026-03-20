@@ -152,7 +152,7 @@ int main(int argc, char *argv[]) {
     srand((u32)get_time_nanoseconds());
 
     init_window_size(&globals.window_width, &globals.window_height);
-    globals.window = SDL_CreateWindow("First-Person Shooter!", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, globals.window_width, globals.window_height, SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
+    globals.window = SDL_CreateWindow("First-Person Shooter!", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, globals.window_width, globals.window_height, SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
     if (!globals.window) {
         logprintf("Failed to create window!\n");
         return 1;
@@ -251,11 +251,24 @@ int main(int argc, char *argv[]) {
                     globals.mouse_cursor_x_delta = (float)event.motion.xrel;
                     globals.mouse_cursor_y_delta = -(float)event.motion.yrel;
                 } break;
+
+                case SDL_MOUSEBUTTONDOWN:
+                case SDL_MOUSEBUTTONUP: {
+                    bool is_down = event.type == SDL_MOUSEBUTTONDOWN;
+
+                    Key_State *state = &key_states[event.button.button];
+                    state->changed   = state->is_down != is_down;
+                    state->is_down   = is_down;
+                } break;
             }
         }
 
         if (is_key_pressed(SDL_SCANCODE_ESCAPE)) {
             globals.should_show_cursor = !globals.should_show_cursor;
+        }
+
+        if (is_key_pressed(SDL_BUTTON_RIGHT)) {
+            globals.flashlight_on = !globals.flashlight_on;
         }
         
         if (!globals.should_show_cursor) {
