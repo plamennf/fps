@@ -1269,7 +1269,9 @@ bool Render_Backend::load_texture(Texture *texture, char *filepath) {
     return create_texture(texture, width, height, format, data, filepath);
 }
 
-bool Render_Backend::create_depth_buffer(Texture *texture, int width, int height, VkFormat format) {
+bool Render_Backend::create_framebuffer(Texture *texture, int width, int height, VkFormat format) {
+    bool is_depth = format == VK_FORMAT_D32_SFLOAT;
+    
     VkImageCreateInfo image_info = {};
     image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     image_info.imageType = VK_IMAGE_TYPE_2D;
@@ -1281,7 +1283,7 @@ bool Render_Backend::create_depth_buffer(Texture *texture, int width, int height
     image_info.format = format;
     image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    image_info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    image_info.usage = is_depth ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT : VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     image_info.samples = VK_SAMPLE_COUNT_1_BIT;
     image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
@@ -1296,7 +1298,7 @@ bool Render_Backend::create_depth_buffer(Texture *texture, int width, int height
     view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
     view_info.format = format;
 
-    view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    view_info.subresourceRange.aspectMask = is_depth ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
     view_info.subresourceRange.baseMipLevel = 0;
     view_info.subresourceRange.levelCount = 1;
     view_info.subresourceRange.baseArrayLayer = 0;

@@ -126,7 +126,7 @@ struct Render_Backend {
     void image_layout_transition(VkCommandBuffer buffer, VkImage image, VkPipelineStageFlags src_stage_mask, VkPipelineStageFlags dst_stage_mask, VkAccessFlags src_access_mask, VkAccessFlags dst_access_mask, VkImageLayout old_layout, VkImageLayout new_layout, VkImageSubresourceRange subresource_range);
     void image_layout_transition(VkCommandBuffer buffer, VkImage image, VkImageLayout old_layout, VkImageLayout new_layout, VkImageSubresourceRange subresource_range);
 
-    bool create_depth_buffer(Texture *texture, int width, int height, VkFormat format);
+    bool create_framebuffer(Texture *texture, int width, int height, VkFormat format);
     void destroy_texture(Texture *texture);
 
     void imgui_init();

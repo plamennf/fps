@@ -8,7 +8,7 @@
 bool Scene_Renderer::init(Render_Backend *_backend) {
     backend = _backend;
 
-    if (!backend->create_depth_buffer(&depth_buffer, backend->get_swap_chain_extent().width, backend->get_swap_chain_extent().height, VK_FORMAT_D32_SFLOAT)) {
+    if (!init_framebuffers()) {
         return false;
     }
     
@@ -121,7 +121,7 @@ void Scene_Renderer::destroy_framebuffers() {
 }
 
 bool Scene_Renderer::init_framebuffers() {
-    if (!backend->create_depth_buffer(&depth_buffer, backend->get_swap_chain_extent().width, backend->get_swap_chain_extent().height, VK_FORMAT_D32_SFLOAT)) {
+    if (!backend->create_framebuffer(&depth_buffer, backend->get_swap_chain_extent().width, backend->get_swap_chain_extent().height, VK_FORMAT_D32_SFLOAT)) {
         return false;
     }
 
