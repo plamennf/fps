@@ -1,127 +1,51 @@
 #pragma once
 
-#include "general.h"
-#include "geometry.h"
-#include "array.h"
-#include "hash_table.h"
-#include "camera.h"
+struct SDL_Window;
+struct Render_Backend;
+struct Scene_Renderer;
+struct Texture;
 
-#include <SDL3/SDL.h>
-
-#include "renderer.h"
-
-const int SHADOW_MAP_WIDTH  = 4096;
-const int SHADOW_MAP_HEIGHT = 4096;
-const int NUM_SHADOW_MAP_CASCADES = 4;      
-
-const float CAMERA_FOV = 90.0f;
-const float CAMERA_Z_NEAR = 0.1f;
-const float CAMERA_Z_FAR  = 500.0f;
-
-struct Mesh;
-struct Framebuffer;
-struct Mesh_Catalog;
-struct Texture_Catalog;
-struct Entity_Manager;
-
-enum Antialiasing_Type {
-    ANTIALIASING_NONE,
-    ANTIALIASING_FXAA,
-    ANTIALIASING_MSAA_2X,
-    ANTIALIASING_MSAA_4X,
-    ANTIALIASING_MSAA_8X,
-};
-
-enum Render_Stage {
-    RENDER_STAGE_SHADOW,
-    RENDER_STAGE_MAIN,
-};
+struct Texture_Registry;
+struct Mesh_Registry;
 
 struct Time_Info {
-    s64 last_time;
+    s64 last_time = 0;
+    s64 sync_last_time = 0;
 
-    s64 real_world_time;
-    s64 dt_ns;
+    s64 real_world_time = 0;
+    s64 delta_time = 0;
+    double delta_time_seconds = 0.0;
 
-    float dt;
-    
-    // For fixed dt updates
-    float accumulated_dt = 0.0f;
-    int fixed_update_fps_cap = 61;
-    float fixed_update_dt = 1.0f / (float)fixed_update_fps_cap;
-    
-    // Debug draw hud info:
-    int num_frames_since_last_fps_update;
-    float accumulated_fps_dt;
-    float draw_fps_dt = 1.0f;
+    // For fps debug info.
+    s64 num_frames_since_last_fps_update = 0;
+    double accumulated_fps_dt = 0.0;
+    double fps_dt = 0.0;
 };
 
 struct Global_Variables {
     SDL_Window *window = NULL;
-    SDL_GLContext gl_context = NULL;
-    bool should_vsync = true;
     bool should_quit = false;
-    bool is_fullscreen = false;
-    bool should_show_cursor = false;
-    bool flashlight_on = false;
-
-    Time_Info time_info = {};
-
-    //float mouse_sensitivity = 0.1f; // @PC
-    float mouse_sensitivity = 0.4f; // @Laptop
-    
-    float mouse_x_delta = 0;
-    float mouse_y_delta = 0;
 
     int window_width  = 0;
     int window_height = 0;
 
-    int render_target_width  = 0;
-    int render_target_height = 0;
+    Time_Info time_info;
+    Memory_Arena frame_memory;
 
-    Antialiasing_Type antialiasing_type = ANTIALIASING_NONE;
+    Render_Backend *render_backend = NULL;
+    Scene_Renderer *scene_renderer = NULL;
     
-    Camera camera = {};
-    Camera_Type camera_type = CAMERA_TYPE_FPS;
+    Texture_Registry *texture_registry = NULL;
+    Mesh_Registry *mesh_registry = NULL;
     
     Texture *white_texture = NULL;
-    Texture *black_texture = NULL;
-    Texture *skybox = NULL;
-    
-    Matrix4 shadow_map_cascade_matrices[NUM_SHADOW_MAP_CASCADES] = {};
-    float shadow_map_cascade_splits[NUM_SHADOW_MAP_CASCADES] = { 3.0f, 10.0f, 40.0f, 200.0f };
-    
-    Shader *shader_color = NULL;
-    Shader *shader_texture = NULL;
-    Shader *shader_basic = NULL;
-    Shader *shader_depth = NULL;
-    Shader *shader_depth_debug = NULL;
-    Shader *shader_resolve = NULL;
-    Shader *shader_resolve_msaa = NULL;
-    Shader *shader_skybox = NULL;
-    Shader *shader_fxaa = NULL;
-
-    Mesh *mesh = NULL;
-    
-    Transform transform = {};
-    Directional_Light directional_light = {};
-    Point_Light point_lights[MAX_POINT_LIGHTS] = {};
-    Spot_Light spot_light = {};
-    
-    Render_Stage render_stage = RENDER_STAGE_MAIN;
-
-    Texture_Catalog *texture_catalog = NULL;
-    Mesh_Catalog *mesh_catalog = NULL;
-
-    Entity_Manager *entity_manager = NULL;
 };
 
 extern Global_Variables globals;
 
-bool is_key_down(SDL_Scancode scancode);
-bool is_key_pressed(SDL_Scancode scancode);
-bool was_key_just_released(SDL_Scancode scancode);
+bool is_key_down(int key_code);
+bool is_key_pressed(int key_code);
+bool was_key_just_released(int key_code);
 
-bool is_mouse_button_down(int button);
-bool is_mouse_button_pressed(int button);
-bool was_mouse_button_just_released(int button);
+double nanoseconds_to_seconds(u64 nanoseconds);
+u64 seconds_to_nanoseconds(double seconds);

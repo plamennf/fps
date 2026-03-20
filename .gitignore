@@ -1,2 +1,8 @@
 .vs/
 build/
+build-int/
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.slnx
+log.txt

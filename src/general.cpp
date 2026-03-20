@@ -1,8 +1,23 @@
-#include "main.h"
+#include "pch.h"
 
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
+
+#ifdef _WIN32
+#include <Windows.h>
+#include <Lmcons.h>
+
+static char name_of_user_buffer[UNLEN + 1];
+static LARGE_INTEGER global_perf_freq;
+
+#else
+
+static Uint64 global_perf_freq;
+
+#endif
+
+static FILE *log_file = NULL;
 
 u64 round_to_next_power_of_2(u64 v) {
     v--;
@@ -48,6 +63,22 @@ bool strings_match(char *a, char *b) {
     }
 
     return *a == 0 && *b == 0;
+}
+
+bool strings_match(const char *a, const char *b) {
+    return strings_match((char *)a, (char *)b);
+}
+
+bool strings_match(char *a, s64 a_len, char *b) {
+    if (a == b) return true;
+    if (!a || !b) return false;
+
+    for (s64 i = 0; i < a_len; i++) {
+        if (b[i] == 0) return false;
+        if (a[i] != b[i]) return false;
+    }
+
+    return b[a_len] == 0;
 }
 
 // Copy-paste from https://github.com/raysan5/raylib/blob/master/src/rtext.c
@@ -250,6 +281,31 @@ void clamp(int *value, int min, int max) {
     if (*value > max) *value = max;
 }
 
+void clamp(u32 *value, u32 min, u32 max) {
+    if (!value) return;
+
+    if (*value < min) *value = min;
+    if (*value > max) *value = max;    
+}
+
+void init_log() {
+    if (!log_file) {
+        log_file = fopen("log.txt", "wt");
+        if (!log_file) {
+            fprintf(stderr, "Failed to open log.txt for writing\n");
+            fflush(stderr);
+        }
+    }
+}
+
+void close_log() {
+    if (log_file) {
+        fflush(log_file);
+        fclose(log_file);
+        log_file = NULL;
+    }
+}
+
 void logprintf(char *fmt, ...) {
     char buf[4096];
 
@@ -258,8 +314,15 @@ void logprintf(char *fmt, ...) {
     vsnprintf(buf, sizeof(buf), fmt, args);
     va_end(args);
 
+#if defined(BUILD_DEBUG) || defined(__EMSCRIPTEN__)
     fprintf(stdout, "%s", buf);
     fflush(stdout);
+#endif
+
+    if (log_file) {
+        fprintf(log_file, "%s", buf);
+        fflush(log_file);
+    }
 }
 
 char *read_entire_file(char *filepath, s64 *length_pointer, bool zero_terminate) {
@@ -282,6 +345,13 @@ char *read_entire_file(char *filepath, s64 *length_pointer, bool zero_terminate)
         if (zero_terminate) result[num_read] = 0;
     }
     return result;
+}
+
+bool file_exists(char *filepath) {
+    FILE *file = fopen(filepath, "rb");
+    if (!file) return false;
+    fclose(file);
+    return true;
 }
 
 char *break_by_space(char *s) {
@@ -325,3 +395,155 @@ float fract(float value) {
     float fractpart = value - intvalue;
     return fractpart;
 }
+
+float random_float() {
+    return (float)rand() / (float)RAND_MAX;
+}
+
+
+#ifdef _WIN32
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+	__declspec(dllexport) DWORD NvOptimusEnablement = 1;
+	__declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
+
+#ifdef __cplusplus
+}
+#endif
+
+// Call this before creating your SDL window or any GUI.
+void enable_dpi_awareness() {
+    // Try Windows 10+ per-monitor V2 awareness
+    HMODULE shcore = LoadLibraryA("Shcore.dll");
+    if (shcore) {
+        typedef HRESULT(WINAPI *SetProcessDpiAwarenessFn)(int);
+        SetProcessDpiAwarenessFn SetProcessDpiAwarenessPtr =
+            (SetProcessDpiAwarenessFn)GetProcAddress(shcore, "SetProcessDpiAwareness");
+        if (SetProcessDpiAwarenessPtr) {
+            // 2 = PROCESS_PER_MONITOR_DPI_AWARE
+            SetProcessDpiAwarenessPtr(2);
+            FreeLibrary(shcore);
+            return;
+        }
+        FreeLibrary(shcore);
+    }
+
+    // Try Windows 8.1+ API (SetProcessDpiAwarenessContext)
+    HMODULE user32 = LoadLibraryA("User32.dll");
+    if (user32) {
+        typedef BOOL(WINAPI *SetProcessDpiAwarenessContextFn)(HANDLE);
+        SetProcessDpiAwarenessContextFn SetProcessDpiAwarenessContextPtr =
+            (SetProcessDpiAwarenessContextFn)GetProcAddress(user32, "SetProcessDpiAwarenessContext");
+        if (SetProcessDpiAwarenessContextPtr) {
+            // -4 = DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2
+            SetProcessDpiAwarenessContextPtr((HANDLE)(-4));
+            FreeLibrary(user32);
+            return;
+        }
+        FreeLibrary(user32);
+    }
+
+    // Fallback for Windows 7 and older
+    HMODULE user32_old = LoadLibraryA("User32.dll");
+    if (user32_old) {
+        typedef BOOL(WINAPI *SetProcessDPIAwareFn)(void);
+        SetProcessDPIAwareFn SetProcessDPIAwarePtr =
+            (SetProcessDPIAwareFn)GetProcAddress(user32_old, "SetProcessDPIAware");
+        if (SetProcessDPIAwarePtr) {
+            SetProcessDPIAwarePtr();
+        }
+        FreeLibrary(user32_old);
+    }
+}
+
+void move_file(char *old_filepath, char *new_filepath) {
+    wchar_t wide_old_filepath[1024];
+    MultiByteToWideChar(CP_UTF8, 0, old_filepath, -1, wide_old_filepath, ArrayCount(wide_old_filepath));
+
+    for (wchar_t *at = wide_old_filepath; *at; at++) {
+        if (*at == L'/') {
+            *at = L'\\';
+        }
+    }
+
+    wchar_t wide_new_filepath[1024];
+    MultiByteToWideChar(CP_UTF8, 0, new_filepath, -1, wide_new_filepath, ArrayCount(wide_new_filepath));
+
+    for (wchar_t *at = wide_new_filepath; *at; at++) {
+        if (*at == L'/') {
+            *at = L'\\';
+        }
+    }
+
+    MoveFileExW(wide_old_filepath, wide_new_filepath, MOVEFILE_REPLACE_EXISTING);
+}
+
+System_Time get_system_time() {
+    SYSTEMTIME system_time;
+    GetSystemTime(&system_time);
+
+    System_Time result;
+
+    result.year   = system_time.wYear;
+    result.month  = system_time.wMonth;
+    result.day    = system_time.wDay;
+    result.hour   = system_time.wHour;
+    result.minute = system_time.wMinute;
+    result.second = system_time.wSecond;
+
+    return result;
+}
+
+System_Time get_local_time() {
+    SYSTEMTIME system_time;
+    GetLocalTime(&system_time);
+
+    System_Time result;
+
+    result.year   = system_time.wYear;
+    result.month  = system_time.wMonth;
+    result.day    = system_time.wDay;
+    result.hour   = system_time.wHour;
+    result.minute = system_time.wMinute;
+    result.second = system_time.wSecond;
+
+    return result;
+}
+
+char *get_name_of_user() {
+    wchar_t buffer[UNLEN + 1];
+    DWORD size = sizeof(buffer) / sizeof(wchar_t);
+
+    GetUserNameW(buffer, &size);
+
+    WideCharToMultiByte(CP_UTF8, 0, buffer, -1, name_of_user_buffer, sizeof(name_of_user_buffer), NULL, NULL);
+
+    return name_of_user_buffer;
+}
+
+s64 get_time_nanoseconds() {
+    if (!global_perf_freq.QuadPart) {
+        QueryPerformanceFrequency(&global_perf_freq);
+    }
+
+    LARGE_INTEGER perf_counter;
+    QueryPerformanceCounter(&perf_counter);
+
+    return (s64)((perf_counter.QuadPart * 1000000000ULL) / (global_perf_freq.QuadPart ? global_perf_freq.QuadPart : 1));
+}
+
+#else
+
+s64 get_time_nanoseconds() {
+    if (!global_perf_freq) {
+        global_perf_freq = SDL_GetPerformanceFrequency();
+    }
+    
+    Uint64 counter = SDL_GetPerformanceCounter();
+    return (Uint64)((counter * 1000000000ULL) / (global_perf_freq ? global_perf_freq : 1));
+}
+
+#endif

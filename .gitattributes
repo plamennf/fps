@@ -1,0 +1,10 @@
+data/meshes/* filter=lfs diff=lfs merge=lfs -text
+data/meshes/*.gltf filter=lfs diff=lfs merge=lfs -text
+data/meshes/*.bin filter=lfs diff=lfs merge=lfs -text
+data/meshes/*.mesh filter=lfs diff=lfs merge=lfs -text
+data/textures/*.png filter=lfs diff=lfs merge=lfs -text
+data/textures/*.jpg filter=lfs diff=lfs merge=lfs -text
+data/textures/*.jpeg filter=lfs diff=lfs merge=lfs -text
+data/textures/*.bmp filter=lfs diff=lfs merge=lfs -text
+data/meshes filter=lfs diff=lfs merge=lfs -text
+data/meshes/Zoro.bin filter=lfs diff=lfs merge=lfs -text
