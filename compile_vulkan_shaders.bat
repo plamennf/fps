@@ -10,3 +10,6 @@ glslangValidator -V -S frag -DFRAGMENT_SHADER -DCOMM=in -o data\shaders\compiled
 
 glslangValidator -V -S vert -DVERTEX_SHADER -DCOMM=out -o data\shaders\compiled\quad.vert.spv data\shaders\quad.glsl
 glslangValidator -V -S frag -DFRAGMENT_SHADER -DCOMM=in -o data\shaders\compiled\quad.frag.spv data\shaders\quad.glsl
+
+glslangValidator -V -S vert -DVERTEX_SHADER -DCOMM=out -o data\shaders\compiled\shadow.vert.spv data\shaders\shadow.glsl
+glslangValidator -V -S frag -DFRAGMENT_SHADER -DCOMM=in -o data\shaders\compiled\shadow.frag.spv data\shaders\shadow.glsl

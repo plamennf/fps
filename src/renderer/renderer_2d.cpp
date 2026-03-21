@@ -135,7 +135,7 @@ void Renderer_2D::end_frame() {
 void Renderer_2D::end_2d(VkCommandBuffer cb) {
     backend->update_buffer(&per_scene_uniform_buffers[backend->current_frame], 0, sizeof(per_scene_uniforms), &per_scene_uniforms);
     
-    vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, quad_pipeline);
+    vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_to_use);
     vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, quad_pipeline_layout, 0, 1, &per_scene_descriptor_sets[backend->current_frame], 0, NULL);
 
     backend->update_buffer(&quad_vertex_buffers[backend->current_frame], 0, num_quad_vertices * sizeof(Immediate_Vertex), quad_vertices);

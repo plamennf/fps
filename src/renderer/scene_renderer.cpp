@@ -9,30 +9,38 @@
 bool Scene_Renderer::init(Render_Backend *_backend, Renderer_2D *_renderer_2d) {
     backend = _backend;
     renderer_2d = _renderer_2d;
-
-    if (!init_framebuffers()) {
-        return false;
-    }
     
     //
     // Create per scene vulkan objects
     //
-    VkDescriptorPoolSize per_scene_uniforms_pool_sizes[1] = {};
+    VkDescriptorPoolSize per_scene_uniforms_pool_sizes[2] = {};
 
     per_scene_uniforms_pool_sizes[0].type            = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     per_scene_uniforms_pool_sizes[0].descriptorCount = Render_Backend::MAX_FRAMES_IN_FLIGHT;
+
+    per_scene_uniforms_pool_sizes[1].type            = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    per_scene_uniforms_pool_sizes[1].descriptorCount = MAX_SHADOW_CASCADES * Render_Backend::MAX_FRAMES_IN_FLIGHT;
     
     if (!backend->create_descriptor_pool(&per_scene_uniforms_descriptor_pool, ArrayCount(per_scene_uniforms_pool_sizes), per_scene_uniforms_pool_sizes, Render_Backend::MAX_FRAMES_IN_FLIGHT)) {
         return false;
     }
 
-    VkDescriptorSetLayoutBinding per_scene_uniforms_descriptor_set_layout_bindings[1] = {};
-
+    eastl::vector <VkDescriptorSetLayoutBinding> per_scene_uniforms_descriptor_set_layout_bindings;
+    per_scene_uniforms_descriptor_set_layout_bindings.resize(1 + MAX_SHADOW_CASCADES);
+    
+    per_scene_uniforms_descriptor_set_layout_bindings[0].binding         = 0;
     per_scene_uniforms_descriptor_set_layout_bindings[0].descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     per_scene_uniforms_descriptor_set_layout_bindings[0].descriptorCount = 1;
     per_scene_uniforms_descriptor_set_layout_bindings[0].stageFlags      = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    for (int i = 1; i < MAX_SHADOW_CASCADES + 1; i++) {
+        per_scene_uniforms_descriptor_set_layout_bindings[i].binding         = i;
+        per_scene_uniforms_descriptor_set_layout_bindings[i].descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        per_scene_uniforms_descriptor_set_layout_bindings[i].descriptorCount = 1;
+        per_scene_uniforms_descriptor_set_layout_bindings[i].stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT;
+    }
     
-    if (!backend->create_descriptor_set_layout(&per_scene_uniforms_descriptor_set_layout, ArrayCount(per_scene_uniforms_descriptor_set_layout_bindings), per_scene_uniforms_descriptor_set_layout_bindings)) {
+    if (!backend->create_descriptor_set_layout(&per_scene_uniforms_descriptor_set_layout, (int)per_scene_uniforms_descriptor_set_layout_bindings.size(), per_scene_uniforms_descriptor_set_layout_bindings.data())) {
         return false;
     }
     
@@ -104,9 +112,24 @@ bool Scene_Renderer::init(Render_Backend *_backend, Renderer_2D *_renderer_2d) {
     mesh_pipepline_info.cull_mode       = CULL_MODE_BACK;
     mesh_pipepline_info.depth_test_mode = DEPTH_TEST_MODE_LEQUAL;
     mesh_pipepline_info.depth_write     = true;
-    mesh_pipepline_info.color_attachment_format = offscreen_buffer.format;
-    mesh_pipepline_info.depth_attachment_format = VK_FORMAT_D32_SFLOAT;    
+    mesh_pipepline_info.color_write     = true;
+    mesh_pipepline_info.color_attachment_format = VK_FORMAT_R16G16B16A16_SFLOAT;//offscreen_buffer.format;
+    mesh_pipepline_info.depth_attachment_format = VK_FORMAT_D32_SFLOAT;//depth_buffer.format;
     if (!backend->create_graphics_pipeline(mesh_pipepline_info, &mesh_pipeline)) {
+        return false;
+    }
+
+    Graphics_Pipeline_Info shadow_pipepline_info = {};
+    shadow_pipepline_info.pipeline_layout = mesh_pipeline_layout;
+    shadow_pipepline_info.shader_filename = "shadow";
+    shadow_pipepline_info.vertex_type     = RENDER_VERTEX_MESH;
+    shadow_pipepline_info.blend_mode      = BLEND_MODE_OFF;
+    shadow_pipepline_info.cull_mode       = CULL_MODE_NONE;
+    shadow_pipepline_info.depth_test_mode = DEPTH_TEST_MODE_LEQUAL;
+    shadow_pipepline_info.depth_write     = true;
+    shadow_pipepline_info.color_write     = false;
+    shadow_pipepline_info.depth_attachment_format = VK_FORMAT_D32_SFLOAT;//shadow_map_buffers[0].format;
+    if (!backend->create_graphics_pipeline(shadow_pipepline_info, &shadow_pipeline)) {
         return false;
     }
 
@@ -117,9 +140,14 @@ bool Scene_Renderer::init(Render_Backend *_backend, Renderer_2D *_renderer_2d) {
     resolve_pipepline_info.blend_mode      = BLEND_MODE_ALPHA;
     resolve_pipepline_info.cull_mode       = CULL_MODE_NONE;
     resolve_pipepline_info.depth_test_mode = DEPTH_TEST_MODE_OFF;
-    resolve_pipepline_info.depth_write     = false;    
+    resolve_pipepline_info.depth_write     = false;
+    resolve_pipepline_info.color_write     = true;
     resolve_pipepline_info.color_attachment_format = backend->get_swap_chain_surface_format();    
     if (!backend->create_graphics_pipeline(resolve_pipepline_info, &resolve_pipeline)) {
+        return false;
+    }
+
+    if (!init_framebuffers()) {
         return false;
     }
     
@@ -134,6 +162,12 @@ void Scene_Renderer::destroy_framebuffers() {
     if (offscreen_buffer.image) {
         backend->destroy_texture(&offscreen_buffer);
     }
+
+    for (int i = 0; i < MAX_SHADOW_CASCADES; i++) {
+        if (shadow_map_buffers[i].image) {
+            backend->destroy_texture(&shadow_map_buffers[i]);
+        }
+    }
 }
 
 bool Scene_Renderer::init_framebuffers() {
@@ -143,6 +177,16 @@ bool Scene_Renderer::init_framebuffers() {
     
     if (!backend->create_framebuffer(&offscreen_buffer, backend->get_swap_chain_extent().width, backend->get_swap_chain_extent().height, VK_FORMAT_R16G16B16A16_SFLOAT)) {
         return false;
+    }
+
+    for (int i = 0; i < MAX_SHADOW_CASCADES; i++) {
+        if (!backend->create_framebuffer(&shadow_map_buffers[i], SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT, VK_FORMAT_D32_SFLOAT)) {
+            return false;
+        }
+
+        for (int j = 0; j < Render_Backend::MAX_FRAMES_IN_FLIGHT; j++) {
+            backend->update_descriptor_set(per_scene_uniforms_descriptor_sets[j], i + 1, &shadow_map_buffers[i]);
+        }
     }
     
     return true;
@@ -155,10 +199,8 @@ void Scene_Renderer::render() {
     
     VkExtent2D extent = backend->get_swap_chain_extent();
 
-    begin_rendering(cb, &offscreen_buffer, &depth_buffer, extent, glm::vec4(0.2f, 0.5f, 0.8f, 1.0f), 1.0f, 0);
-
     float aspect_ratio = extent.width / (extent.height > 0 ? (float)extent.height : 1.0f);
-    glm::mat4 projection_matrix = glm::perspective(glm::radians(90.0f), aspect_ratio, 0.1f, 1000.0f);
+    glm::mat4 projection_matrix = glm::perspective(glm::radians(camera.fov), aspect_ratio, camera.z_near, camera.z_far);
     projection_matrix[1][1] *= -1;
     glm::mat4 view_matrix = get_view_matrix(&camera);
 
@@ -169,16 +211,43 @@ void Scene_Renderer::render() {
     memcpy(per_scene_uniforms.lights, lights, MAX_LIGHTS * sizeof(Light));
 
     per_scene_uniforms.camera_position   = camera.position;
+
+    {
+        Light *directional_light = &lights[0];
+        for (int i = 1; i < num_lights; i++) {
+            if (lights[i].type == LIGHT_TYPE_DIRECTIONAL) {
+                directional_light = &lights[i];
+                break;
+            }
+        }
+
+        update_shadow_map_cascade_matrices(&per_scene_uniforms, directional_light);
+    }
     
     backend->update_buffer(&per_scene_uniform_buffers[backend->current_frame], 0, sizeof(per_scene_uniforms), &per_scene_uniforms);
     //backend->update_descriptor_set(per_scene_uniforms_descriptor_sets[backend->current_frame], 0, &per_scene_uniform_buffers[backend->current_frame]);
 
-    vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh_pipeline);
-
+    vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, shadow_pipeline);
     vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh_pipeline_layout, 0, 1, &per_scene_uniforms_descriptor_sets[backend->current_frame], 0, NULL);
 
-    render_all_entities(cb);
+    for (int i = 0; i < MAX_SHADOW_CASCADES; i++) {
+        backend->image_layout_transition(cb, shadow_map_buffers[i].image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, { VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1 });
+        
+        begin_rendering(cb, NULL, &shadow_map_buffers[i], {SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT}, glm::vec4(0.2f, 0.5f, 0.8f, 1.0f), 1.0f, 0);
 
+        render_all_entities(cb, i);
+
+        end_rendering(cb);
+
+        backend->image_layout_transition(cb, shadow_map_buffers[i].image, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, { VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1 });
+    }
+    
+    // Draw main pass
+    backend->image_layout_transition(cb, depth_buffer.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, { VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1 });
+    vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh_pipeline_layout, 0, 1, &per_scene_uniforms_descriptor_sets[backend->current_frame], 0, NULL);
+    begin_rendering(cb, &offscreen_buffer, &depth_buffer, extent, glm::vec4(0.2f, 0.5f, 0.8f, 1.0f), 1.0f, 0);
+    vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh_pipeline);
+    render_all_entities(cb);
     end_rendering(cb);
 
     VkImageSubresourceRange color_range = {};
@@ -228,6 +297,8 @@ void Scene_Renderer::render() {
 
 void Scene_Renderer::set_camera(Camera _camera) {
     camera = _camera;
+
+    shadow_cascade_splits[MAX_SHADOW_CASCADES - 1] = camera.z_far;
 }
 
 void Scene_Renderer::add_light(Light light) {
@@ -308,7 +379,7 @@ void Scene_Renderer::generate_gpu_data_for_submesh(Submesh *submesh) {
     submesh->has_gpu_data = true;
 }
 
-void Scene_Renderer::render_all_entities(VkCommandBuffer cb) {
+void Scene_Renderer::render_all_entities(VkCommandBuffer cb, int cascade_index) {
     for (int i = 0; i < render_entities.size(); i++) {
         MyZoneScopedN("Draw single mesh");
         
@@ -316,8 +387,9 @@ void Scene_Renderer::render_all_entities(VkCommandBuffer cb) {
 
         Per_Object_Uniforms per_object_uniforms = {};
 
-        per_object_uniforms.world_matrix = entity.world_matrix;
-        per_object_uniforms.scale_color  = entity.scale_color;
+        per_object_uniforms.world_matrix         = entity.world_matrix;
+        per_object_uniforms.scale_color          = entity.scale_color;
+        per_object_uniforms.shadow_cascade_index = cascade_index;
         
         vkCmdPushConstants(cb, mesh_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(Per_Object_Uniforms), &per_object_uniforms);
         
@@ -372,7 +444,7 @@ void Scene_Renderer::begin_rendering(VkCommandBuffer cb, Texture *color_target, 
     }
     
     if (depth_target) {
-        backend->image_layout_transition(cb, depth_target->image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, { VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1 });
+        //backend->image_layout_transition(cb, depth_target->image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, { VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1 });
 
         depth_attachment_info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
         depth_attachment_info.imageView = depth_target->view;
@@ -409,4 +481,85 @@ void Scene_Renderer::begin_rendering(VkCommandBuffer cb, Texture *color_target, 
 
 void Scene_Renderer::end_rendering(VkCommandBuffer cb) {
     vkCmdEndRendering(cb);
+}
+
+void Scene_Renderer::update_shadow_map_cascade_matrices(Per_Scene_Uniforms *uniforms, Light *directional_light) {
+    glm::mat4 view_matrix = get_view_matrix(&camera);
+    glm::mat4 inv_view_matrix = glm::inverse(view_matrix);
+
+    glm::mat4 light_matrix = glm::lookAt(glm::vec3(0, 0, 0), directional_light->direction, glm::vec3(0, 1, 0));
+
+    VkExtent2D extent = backend->get_swap_chain_extent();
+    float aspect_ratio = (float)extent.width / (float)extent.height;
+    float tan_half_v_fov = tanf(glm::radians(camera.fov * 0.5f));
+    float tan_half_h_fov = tan_half_v_fov * aspect_ratio;
+
+    for (int i = 0; i < MAX_SHADOW_CASCADES; i++) {
+        float curr_cascade = (i == 0) ? camera.z_near : shadow_cascade_splits[i - 1];
+        float next_cascade = shadow_cascade_splits[i];
+        
+        float xn = curr_cascade * tan_half_h_fov;
+        float xf = next_cascade * tan_half_h_fov;
+        float yn = curr_cascade * tan_half_v_fov;
+        float yf = next_cascade * tan_half_v_fov;
+
+        glm::vec4 frustum_corners[] = {
+            glm::vec4(+xn, +yn, -curr_cascade, 1.0f),
+            glm::vec4(-xn, +yn, -curr_cascade, 1.0f),
+            glm::vec4(+xn, -yn, -curr_cascade, 1.0f),
+            glm::vec4(-xn, -yn, -curr_cascade, 1.0f),
+
+            glm::vec4(+xf, +yf, -next_cascade, 1.0f),
+            glm::vec4(-xf, +yf, -next_cascade, 1.0f),
+            glm::vec4(+xf, -yf, -next_cascade, 1.0f),
+            glm::vec4(-xf, -yf, -next_cascade, 1.0f),
+        };
+        
+        glm::vec4 frustum_corners_l[8];
+
+        glm::vec3 center_world = glm::vec3(0, 0, 0);
+
+        for (int j = 0; j < 8; j++) {
+            glm::vec4 vw = inv_view_matrix * frustum_corners[j];
+            center_world += glm::vec3(vw.x, vw.y, vw.z);
+        }
+        center_world = center_world / 8.0f;
+        
+        glm::vec3 light_dir = glm::normalize_or_zero(directional_light->direction);
+        glm::vec3 light_eye = center_world - light_dir * 1000.0f;
+
+        glm::vec3 world_up = (fabsf(light_dir.y) > 0.99f) ? glm::vec3(0, 0, 1) : glm::vec3(0, 1, 0);
+        //world_up = v3(0, 1, 0);
+        glm::mat4 light_view = glm::lookAt(light_eye, center_world, world_up);
+        
+        float min_x = FLT_MAX, max_x = -FLT_MAX;
+        float min_y = FLT_MAX, max_y = -FLT_MAX;
+        float min_z = FLT_MAX, max_z = -FLT_MAX;
+        
+        for (int j = 0; j < 8; j++) {
+            glm::vec4 vw = inv_view_matrix * frustum_corners[j];
+
+            frustum_corners_l[j] = light_view * vw;
+
+            min_x = Min(min_x, frustum_corners_l[j].x);
+            min_y = Min(min_y, frustum_corners_l[j].y);
+            min_z = Min(min_z, frustum_corners_l[j].z);
+            
+            max_x = Max(max_x, frustum_corners_l[j].x);
+            max_y = Max(max_y, frustum_corners_l[j].y);
+            max_z = Max(max_z, frustum_corners_l[j].z);
+        }
+
+        float world_units_per_texel = (max_x - min_x) / (float)SHADOW_MAP_WIDTH;
+        min_x = floorf(min_x / world_units_per_texel) * world_units_per_texel;
+        max_x = floorf(max_x / world_units_per_texel) * world_units_per_texel;
+        min_y = floorf(min_y / world_units_per_texel) * world_units_per_texel;
+        max_y = floorf(max_y / world_units_per_texel) * world_units_per_texel;
+        
+        glm::mat4 light_proj = glm::ortho(min_x, max_x, max_y, min_y, -max_z, -min_z);
+        
+        uniforms->light_matrix[i] = light_proj * light_view;
+
+        uniforms->cascade_splits[i] = glm::vec4(shadow_cascade_splits[i], 0.0f, 0.0f, 0.0f);
+    }
 }

@@ -17,6 +17,10 @@ struct Camera {
     float jump_velocity;
     bool is_on_ground;
 
+    float z_near = 0.1f;
+    float z_far = 2000.0f;
+    float fov = 90.0f;
+    
     float movement_speed            = 10.0f;
     float shift_movement_multiplier = 1.5f;
     float max_jump_velocity         = 0.5f;

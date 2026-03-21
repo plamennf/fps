@@ -1,5 +1,10 @@
 #version 450
 
+#define MAX_SHADOW_CASCADES 4
+
+#define SHADOW_MAP_WIDTH  4096
+#define SHADOW_MAP_HEIGHT 4096
+
 layout(location = 0) COMM vec2 frag_uv;
 layout(location = 1) COMM vec4 frag_color;
 layout(location = 2) COMM vec3 world_normal;
@@ -29,9 +34,10 @@ struct Light {
 layout(set = 0, binding = 0) uniform Per_Scene {
     mat4 projection;
     mat4 view;
+    mat4 light_matrix[MAX_SHADOW_CASCADES];
+    vec4 cascade_splits[MAX_SHADOW_CASCADES];
     Light lights[MAX_LIGHTS];
     vec3 camera_position;
-    float _padding;
 } per_scene;
 
 layout(set = 1, binding = 0) uniform Material {
@@ -53,6 +59,7 @@ layout(location = 5) in vec3 in_bitangent;
 layout(push_constant) uniform Per_Object {
     mat4 world;
     vec4 scale_color;
+    int shadow_cascade_index;
 } per_object;
 
 void main() {
@@ -68,7 +75,7 @@ void main() {
     vec3 N = normalize(world_normal);
     T = normalize(T - dot(T, N) * N);
     vec3 B = cross(N, T);
-    TBN = transpose(mat3(T, B, N));
+    TBN = mat3(T, B, N);
 }
 
 #endif
@@ -82,6 +89,91 @@ layout(set = 1, binding = 2) uniform sampler2D normal_texture;
 layout(set = 1, binding = 3) uniform sampler2D metallic_roughness_texture;
 layout(set = 1, binding = 4) uniform sampler2D ao_texture;
 layout(set = 1, binding = 5) uniform sampler2D emissive_texture;
+
+layout(set = 0, binding = 1) uniform sampler2D shadow_map_0;
+layout(set = 0, binding = 2) uniform sampler2D shadow_map_1;
+layout(set = 0, binding = 3) uniform sampler2D shadow_map_2;
+layout(set = 0, binding = 4) uniform sampler2D shadow_map_3;
+
+int calculate_cascade_index(vec3 world_position, vec3 camera_position) {
+    //float depth = length(world_position - camera_position);
+    vec3 view_pos = (per_scene.view * vec4(world_position, 1.0)).xyz;
+    float depth   = -view_pos.z; // because -z is forward
+
+    int index = MAX_SHADOW_CASCADES - 1;
+    if (depth < per_scene.cascade_splits[0].x) index = 0;
+    else if (depth < per_scene.cascade_splits[1].x) index = 1;
+    else if (depth < per_scene.cascade_splits[2].x) index = 2;
+
+    return index;
+}
+
+float pcf_shadow(vec3 proj_coords, int cascade_index) {
+    float shadow = 0.0;
+    float total_weight = 0.0;
+    
+    float current_depth = proj_coords.z;
+    float bias = 0.01;
+
+    for (int x = -2; x <= 2; x++) {
+        for (int y = -2; y <= 2; y++) {
+            float s = 0.0;
+            switch (cascade_index) {
+                case 0: {
+                    vec2 offset = vec2(x, y) / vec2(SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT);
+                    float shadow_depth = texture(shadow_map_0, proj_coords.xy + offset).r;
+                    s = current_depth - bias > shadow_depth ? 0.0 : 1.0;
+                } break;
+
+                case 1: {
+                    vec2 offset = vec2(x, y) / vec2(SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT);
+                    float shadow_depth = texture(shadow_map_1, proj_coords.xy + offset).r;
+                    s = current_depth - bias > shadow_depth ? 0.0 : 1.0;
+                } break;
+
+                case 2: {
+                    vec2 offset = vec2(x, y) / vec2(SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT);
+                    float shadow_depth = texture(shadow_map_2, proj_coords.xy + offset).r;
+                    s = current_depth - bias > shadow_depth ? 0.0 : 1.0;
+                } break;
+
+                case 3: {
+                    vec2 offset = vec2(x, y) / vec2(SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT);
+                    float shadow_depth = texture(shadow_map_3, proj_coords.xy + offset).r;
+                    s = current_depth - bias > shadow_depth ? 0.0 : 1.0;
+                } break;
+            }
+
+            float weight = 1.0 / (1.0 + length(vec2(x, y)));
+            total_weight += weight;
+            shadow += s * weight;
+        }
+    }
+
+    shadow /= total_weight;
+    return shadow;
+}
+
+float calculate_shadow(int cascade_index, vec3 world_position) {
+    vec4 shadow_pos;
+
+    switch (cascade_index) {
+        case 0: shadow_pos = (per_scene.light_matrix[0] * vec4(world_position, 1.0)); break;
+        case 1: shadow_pos = (per_scene.light_matrix[1] * vec4(world_position, 1.0)); break;
+        case 2: shadow_pos = (per_scene.light_matrix[2] * vec4(world_position, 1.0)); break;
+        case 3: shadow_pos = (per_scene.light_matrix[3] * vec4(world_position, 1.0)); break;
+
+        default: shadow_pos = vec4(0.0, 0.0, 0.0, 1.0); break;
+    }
+
+    vec3 proj_coords = shadow_pos.xyz / shadow_pos.w;
+    proj_coords.x = proj_coords.x * 0.5 + 0.5;
+    //proj_coords.y = proj_coords.y * -0.5 + 0.5; // This is for directx 11
+    proj_coords.y = proj_coords.y * 0.5 + 0.5; // This is for vulkan
+
+    float shadow = pcf_shadow(proj_coords, cascade_index);
+    return shadow;
+}
 
 float distribution_ggx(vec3 N, vec3 H, float roughness) {
     float a      = roughness * roughness;
@@ -122,7 +214,7 @@ vec3 fresnel_schlick(float cos_theta, vec3 F0) {
 void main() {
     vec4 full_albedo = texture(albedo_texture, frag_uv);
     vec3 albedo      = full_albedo.rgb * material.albedo_factor.xyz * frag_color.rgb;
-
+    
     vec3 normal      = world_normal;
 
     vec4 full_mr = texture(metallic_roughness_texture, frag_uv);
@@ -156,6 +248,9 @@ void main() {
         N = normalize(TBN * normal);
     }
 
+    int cascade_index = calculate_cascade_index(world_position, per_scene.camera_position);
+    float shadow = calculate_shadow(cascade_index, world_position);
+    
     vec3 Lo = vec3(0, 0, 0);
     for (int i = 0; i < MAX_LIGHTS; i++) {
         Light light = per_scene.lights[i];
@@ -167,7 +262,7 @@ void main() {
         switch (light.type) {
             case LIGHT_TYPE_DIRECTIONAL: {
                 L = normalize(-light.direction);
-                // s = shadow;
+                s = shadow;
             } break;
 
             case LIGHT_TYPE_POINT: {

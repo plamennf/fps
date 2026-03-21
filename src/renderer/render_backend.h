@@ -84,6 +84,7 @@ struct Graphics_Pipeline_Info {
     Cull_Mode cull_mode;
     Depth_Test_Mode depth_test_mode;
     bool depth_write;
+    bool color_write;
 
     VkFormat color_attachment_format;
     VkFormat depth_attachment_format;

@@ -795,7 +795,10 @@ bool Render_Backend::create_graphics_pipeline(Graphics_Pipeline_Info info, VkPip
     multisampling.alphaToOneEnable = VK_FALSE;
 
     VkPipelineColorBlendAttachmentState color_blend_attachment = {};
-    color_blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+
+    if (info.color_write) {
+        color_blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    }
 
     switch (info.blend_mode) {
         case BLEND_MODE_OFF: {
@@ -827,10 +830,10 @@ bool Render_Backend::create_graphics_pipeline(Graphics_Pipeline_Info info, VkPip
 
     VkPipelineRenderingCreateInfoKHR pipeline_create = {};
     pipeline_create.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR;
-    pipeline_create.colorAttachmentCount = 1;
+    pipeline_create.colorAttachmentCount = info.color_attachment_format != VK_FORMAT_UNDEFINED ? 1 : 0;
     //pipeline_create.pColorAttachmentFormats = &swap_chain_surface_format.format;
-    pipeline_create.pColorAttachmentFormats = &info.color_attachment_format;
-
+    pipeline_create.pColorAttachmentFormats = info.color_attachment_format != VK_FORMAT_UNDEFINED ? &info.color_attachment_format : NULL;
+    
     if (info.depth_attachment_format != VK_FORMAT_UNDEFINED) {
         pipeline_create.depthAttachmentFormat = info.depth_attachment_format;
     }
@@ -1313,9 +1316,9 @@ bool Render_Backend::create_framebuffer(Texture *texture, int width, int height,
 
     VkSamplerCreateInfo sampler_info = {};
     sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-    sampler_info.minFilter = VK_FILTER_LINEAR;
-    sampler_info.magFilter = VK_FILTER_LINEAR;
-    sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    sampler_info.minFilter = VK_FILTER_NEAREST;
+    sampler_info.magFilter = VK_FILTER_NEAREST;
+    sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
     sampler_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
     sampler_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
     sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
