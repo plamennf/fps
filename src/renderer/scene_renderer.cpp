@@ -264,29 +264,13 @@ void Scene_Renderer::render() {
     renderer_2d->end_2d(cb);
 
     renderer_2d->begin_2d(extent);
-    renderer_2d->draw_quad(globals.white_texture, {50, 50}, {64, 64}, FLIP_MODE_NONE, NULL, {1, 0.5f, 0.2f, 1});
+    draw_hud();
     renderer_2d->end_2d(cb);
+
+    globals.render_backend->imgui_begin_frame();
+    draw_imgui_stuff();
+    globals.render_backend->imgui_end_frame(cb);
     
-    // TODO: Move this out of here eventually. It's here because it needs to be between vkCmdBeginRendering and vkCmdEndRendering
-    {
-        MyZoneScopedN("ImGui Rendering");
-        static float current_dt = 1.0f;
-        static int frame_counter = 0;
-
-        frame_counter++;
-        if (frame_counter > 30) {
-            current_dt = (float)globals.time_info.delta_time_seconds;
-            frame_counter = 0;
-        }
-        
-        globals.render_backend->imgui_begin_frame();
-        ImGui::Begin("Stats");
-        ImGui::Text("FPS: %d", (int)(1.0f / current_dt));
-        ImGui::Text("Frame time: %.2fms", current_dt * 1000.0f);
-        ImGui::End();
-        globals.render_backend->imgui_end_frame(cb);
-    }
-
     end_rendering(cb);
 
     backend->image_layout_transition(cb, backend->get_current_swap_chain_image(), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, color_range);
@@ -562,4 +546,26 @@ void Scene_Renderer::update_shadow_map_cascade_matrices(Per_Scene_Uniforms *unif
 
         uniforms->cascade_splits[i] = glm::vec4(shadow_cascade_splits[i], 0.0f, 0.0f, 0.0f);
     }
+}
+
+// TODO: Move this out of here eventually. It's here because it needs to be between vkCmdBeginRendering and vkCmdEndRendering
+void Scene_Renderer::draw_imgui_stuff() {
+    MyZoneScopedN("ImGui Rendering");
+    static float current_dt = 1.0f;
+    static int frame_counter = 0;
+
+    frame_counter++;
+    if (frame_counter > 30) {
+        current_dt = (float)globals.time_info.delta_time_seconds;
+        frame_counter = 0;
+    }
+    
+    ImGui::Begin("Stats");
+    ImGui::Text("FPS: %d", (int)(1.0f / current_dt));
+    ImGui::Text("Frame time: %.2fms", current_dt * 1000.0f);
+    ImGui::End();
+}
+
+void Scene_Renderer::draw_hud() {
+    renderer_2d->draw_quad(globals.white_texture, {50, 50}, {64, 64}, FLIP_MODE_NONE, NULL, {1, 0.5f, 0.2f, 1});
 }

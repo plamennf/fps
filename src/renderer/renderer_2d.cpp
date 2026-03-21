@@ -83,6 +83,7 @@ bool Renderer_2D::init(Render_Backend *_backend) {
     quad_pipepline_info.cull_mode       = CULL_MODE_NONE;
     quad_pipepline_info.depth_test_mode = DEPTH_TEST_MODE_OFF;
     quad_pipepline_info.depth_write     = false;
+    quad_pipepline_info.color_write     = true;
     
     quad_pipepline_info.color_attachment_format = backend->get_swap_chain_surface_format();
     quad_pipepline_info.depth_attachment_format = VK_FORMAT_D32_SFLOAT;

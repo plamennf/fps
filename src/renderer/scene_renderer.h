@@ -90,6 +90,9 @@ private:
     void end_rendering(VkCommandBuffer cb);
 
     void update_shadow_map_cascade_matrices(Per_Scene_Uniforms *uniforms, Light *directional_light);
+
+    void draw_imgui_stuff();
+    void draw_hud();
     
 private:
     Render_Backend *backend = NULL;
