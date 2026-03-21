@@ -93,10 +93,14 @@ struct Graphics_Pipeline_Info {
 struct Render_Backend {
     static const int MAX_FRAMES_IN_FLIGHT = 2;
 
+    char selected_gpu_name[VK_MAX_PHYSICAL_DEVICE_NAME_SIZE];
+    
     bool init(SDL_Window *window);
 
     void device_wait_idle();
     void wait_on_all_fences();
+
+    void get_memory_usage_info(double *total_available_vram_mb, double *used_vram_mb);
     
     bool begin_frame();
     bool end_frame();

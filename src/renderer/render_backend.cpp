@@ -80,7 +80,13 @@ bool Render_Backend::init(SDL_Window *_window) {
     if (!create_command_pool()) return false;
     if (!create_command_buffer()) return false;
     if (!create_sync_objects()) return false;
-    
+
+    {
+        VkPhysicalDeviceProperties properties;
+        vkGetPhysicalDeviceProperties(physical_device, &properties);
+        memcpy(selected_gpu_name, properties.deviceName, VK_MAX_PHYSICAL_DEVICE_NAME_SIZE);
+    }
+        
     return true;
 }
 
@@ -1575,4 +1581,26 @@ void Render_Backend::imgui_begin_frame() {
 void Render_Backend::imgui_end_frame(VkCommandBuffer cb) {
     ImGui::Render();
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cb);
+}
+
+void Render_Backend::get_memory_usage_info(double *total_available_vram_mb, double *used_vram_mb) {
+    VkPhysicalDeviceMemoryBudgetPropertiesEXT budget_properties ={};
+    budget_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_BUDGET_PROPERTIES_EXT;
+
+    VkPhysicalDeviceMemoryProperties2 memory_properties = {};
+    memory_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2;
+    memory_properties.pNext = &budget_properties;
+
+    vkGetPhysicalDeviceMemoryProperties2(physical_device, &memory_properties);
+
+    for (uint32_t i = 0; i < memory_properties.memoryProperties.memoryHeapCount; i++) {
+        if (memory_properties.memoryProperties.memoryHeaps[i].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) {
+            VkDeviceSize budget = budget_properties.heapBudget[i];
+            VkDeviceSize usage  = budget_properties.heapUsage[i];
+
+            if (total_available_vram_mb) *total_available_vram_mb = budget / (1024.0 * 1024.0);
+            if (used_vram_mb) *used_vram_mb = usage / (1024.0 * 1024.0);
+            break;
+        }
+    }
 }

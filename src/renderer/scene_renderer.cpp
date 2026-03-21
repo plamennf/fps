@@ -563,6 +563,12 @@ void Scene_Renderer::draw_imgui_stuff() {
     ImGui::Begin("Stats");
     ImGui::Text("FPS: %d", (int)(1.0f / current_dt));
     ImGui::Text("Frame time: %.2fms", current_dt * 1000.0f);
+    ImGui::Text("GPU: %s", backend->selected_gpu_name);
+
+    double total_available_vram_mb, used_vram_mb;
+    backend->get_memory_usage_info(&total_available_vram_mb, &used_vram_mb);
+    ImGui::Text("VRAM: %d/%d MB", (int)used_vram_mb, (int)total_available_vram_mb);
+    
     ImGui::End();
 }
 
