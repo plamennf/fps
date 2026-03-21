@@ -1,6 +1,7 @@
 #pragma once
 
 #include "render_backend.h"
+#include "font.h"
 
 enum Flip_Mode {
     FLIP_MODE_NONE         = 0,
@@ -63,6 +64,7 @@ struct Renderer_2D {
     void end_2d(VkCommandBuffer cb);
 
     void draw_quad(Texture *texture, glm::vec2 position, glm::vec2 size, Flip_Mode flip_mode, Rectangle2i *src_rect, glm::vec4 color);
+    void draw_text(Dynamic_Font *font, char *text, int x, int y, glm::vec4 color);
     
 private:
     Render_Quads_Entry *get_current_quads(Texture *texture, int num_quads);

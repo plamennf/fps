@@ -92,7 +92,7 @@ private:
     void update_shadow_map_cascade_matrices(Per_Scene_Uniforms *uniforms, Light *directional_light);
 
     void draw_imgui_stuff();
-    void draw_hud();
+    void draw_hud(VkExtent2D extent);
     
 private:
     Render_Backend *backend = NULL;

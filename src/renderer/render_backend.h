@@ -138,7 +138,8 @@ struct Render_Backend {
 
     bool create_framebuffer(Texture *texture, int width, int height, VkFormat format);
     void destroy_texture(Texture *texture);
-
+    bool update_texture(Texture *texture, int x, int y, int width, int height, u8 *data);
+    
     void imgui_init();
     void imgui_begin_frame();
     void imgui_end_frame(VkCommandBuffer cb);

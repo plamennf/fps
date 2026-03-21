@@ -1361,76 +1361,11 @@ bool Render_Backend::create_texture(Texture *texture, int width, int height, VkF
         return false;
     }
 
-    VkDeviceSize layer_size = (VkDeviceSize)width * (VkDeviceSize)height * (VkDeviceSize)4;
-    int layer_count = 1;
-    VkDeviceSize image_size = layer_count * layer_size;
-
-    Gpu_Buffer staging_buffer = {};
-    
-    VkBufferCreateInfo staging_buffer_create_info = {};
-    staging_buffer_create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    staging_buffer_create_info.size  = image_size;
-    staging_buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-
-    VmaAllocationCreateInfo staging_buffer_allocation_create_info = {};
-    staging_buffer_allocation_create_info.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_ALLOW_TRANSFER_INSTEAD_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
-    staging_buffer_allocation_create_info.usage = VMA_MEMORY_USAGE_AUTO;
-
-    if (vmaCreateBuffer(allocator, &staging_buffer_create_info, &staging_buffer_allocation_create_info, &staging_buffer.buffer, &staging_buffer.allocation, NULL) != VK_SUCCESS) {
-        logprintf("Failed to allocate vulkan vertex buffer!\n");
-        return false;
+    if (data) {
+        if (!update_texture(texture, 0, 0, width, height, data)) {
+            return false;
+        }
     }
-
-    void *mapped_staging_buffer_data = NULL;
-    if (vmaMapMemory(allocator, staging_buffer.allocation, &mapped_staging_buffer_data)) {
-        logprintf("Failed to map vulkan buffer!\n");
-        return false;
-    }
-    memcpy(mapped_staging_buffer_data, data, (u32)image_size);
-    vmaUnmapMemory(allocator, staging_buffer.allocation);
-
-    VkCommandBufferBeginInfo begin_info = {};
-    begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-    if (vkBeginCommandBuffer(copy_command_buffer, &begin_info) != VK_SUCCESS) {
-        logprintf("Failed to begin command buffer");
-        return false;
-    }
-
-    VkImageSubresourceRange subresource_range = {};
-    subresource_range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    subresource_range.levelCount = 1;
-    subresource_range.layerCount = 1;
-    
-    // VK_IMAGE_LAYOUT_UNDEFINED, VK_IMGE_LAYOUT_TRANSFER_DST_OPTIMAL
-    image_layout_transition(copy_command_buffer, texture->image, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, subresource_range);
-
-    VkBufferImageCopy buffer_image_copy = {};
-    buffer_image_copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    buffer_image_copy.imageSubresource.layerCount = 1;
-    buffer_image_copy.imageExtent.width = width;
-    buffer_image_copy.imageExtent.height = height;
-    buffer_image_copy.imageExtent.depth = 1;
-
-    vkCmdCopyBufferToImage(copy_command_buffer, staging_buffer.buffer, texture->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &buffer_image_copy);
-
-    // VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-    image_layout_transition(copy_command_buffer, texture->image, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, subresource_range);
-
-    vkEndCommandBuffer(copy_command_buffer);
-
-    VkSubmitInfo submit_info = {};
-    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submit_info.commandBufferCount = 1;
-    submit_info.pCommandBuffers = &copy_command_buffer;
-    
-    if (vkQueueSubmit(graphics_queue, 1, &submit_info, NULL) != VK_SUCCESS) {
-        logprintf("Failed to submit to graphics and present queue");
-        return false;
-    }
-    
-    vkQueueWaitIdle(graphics_queue);
 
     VkImageViewCreateInfo create_info = {};
     create_info.sType        = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -1490,6 +1425,83 @@ void Render_Backend::destroy_texture(Texture *texture) {
         vkDestroySampler(device, texture->sampler, NULL);
         texture->sampler = VK_NULL_HANDLE;
     }
+}
+
+bool Render_Backend::update_texture(Texture *texture, int x, int y, int width, int height, u8 *data) {
+    VkDeviceSize layer_size = (VkDeviceSize)width * (VkDeviceSize)height * (VkDeviceSize)4;
+    int layer_count = 1;
+    VkDeviceSize image_size = layer_count * layer_size;
+
+    Gpu_Buffer staging_buffer = {};
+    
+    VkBufferCreateInfo staging_buffer_create_info = {};
+    staging_buffer_create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    staging_buffer_create_info.size  = image_size;
+    staging_buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+
+    VmaAllocationCreateInfo staging_buffer_allocation_create_info = {};
+    staging_buffer_allocation_create_info.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_ALLOW_TRANSFER_INSTEAD_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+    staging_buffer_allocation_create_info.usage = VMA_MEMORY_USAGE_AUTO;
+
+    if (vmaCreateBuffer(allocator, &staging_buffer_create_info, &staging_buffer_allocation_create_info, &staging_buffer.buffer, &staging_buffer.allocation, NULL) != VK_SUCCESS) {
+        logprintf("Failed to allocate vulkan vertex buffer!\n");
+        return false;
+    }
+
+    void *mapped_staging_buffer_data = NULL;
+    if (vmaMapMemory(allocator, staging_buffer.allocation, &mapped_staging_buffer_data)) {
+        logprintf("Failed to map vulkan buffer!\n");
+        return false;
+    }
+    memcpy(mapped_staging_buffer_data, data, (u32)image_size);
+    vmaUnmapMemory(allocator, staging_buffer.allocation);
+
+    VkCommandBufferBeginInfo begin_info = {};
+    begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+    if (vkBeginCommandBuffer(copy_command_buffer, &begin_info) != VK_SUCCESS) {
+        logprintf("Failed to begin command buffer");
+        return false;
+    }
+
+    VkImageSubresourceRange subresource_range = {};
+    subresource_range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    subresource_range.levelCount = 1;
+    subresource_range.layerCount = 1;
+    
+    // VK_IMAGE_LAYOUT_UNDEFINED, VK_IMGE_LAYOUT_TRANSFER_DST_OPTIMAL
+    image_layout_transition(copy_command_buffer, texture->image, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, subresource_range);
+
+    VkBufferImageCopy buffer_image_copy = {};
+    buffer_image_copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    buffer_image_copy.imageSubresource.layerCount = 1;
+    buffer_image_copy.imageOffset.x = x;
+    buffer_image_copy.imageOffset.y = y;
+    buffer_image_copy.imageExtent.width = width;
+    buffer_image_copy.imageExtent.height = height;
+    buffer_image_copy.imageExtent.depth = 1;
+
+    vkCmdCopyBufferToImage(copy_command_buffer, staging_buffer.buffer, texture->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &buffer_image_copy);
+
+    // VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+    image_layout_transition(copy_command_buffer, texture->image, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, subresource_range);
+
+    vkEndCommandBuffer(copy_command_buffer);
+
+    VkSubmitInfo submit_info = {};
+    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers = &copy_command_buffer;
+    
+    if (vkQueueSubmit(graphics_queue, 1, &submit_info, NULL) != VK_SUCCESS) {
+        logprintf("Failed to submit to graphics and present queue");
+        return false;
+    }
+    
+    vkQueueWaitIdle(graphics_queue);
+
+    return true;
 }
 
 void Render_Backend::imgui_init() {

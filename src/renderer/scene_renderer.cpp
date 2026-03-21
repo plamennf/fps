@@ -264,7 +264,7 @@ void Scene_Renderer::render() {
     renderer_2d->end_2d(cb);
 
     renderer_2d->begin_2d(extent);
-    draw_hud();
+    draw_hud(extent);
     renderer_2d->end_2d(cb);
 
     globals.render_backend->imgui_begin_frame();
@@ -566,6 +566,56 @@ void Scene_Renderer::draw_imgui_stuff() {
     ImGui::End();
 }
 
-void Scene_Renderer::draw_hud() {
+static glm::vec3 hsv_to_rgb(const glm::vec3& hsv) {
+    float h = hsv.x * 6.0f;
+    float s = hsv.y;
+    float v = hsv.z;
+
+    int i = (int)floor(h) % 6;
+    float f = h - floor(h);
+    float p = v * (1.0f - s);
+    float q = v * (1.0f - f * s);
+    float t = v * (1.0f - (1.0f - f) * s);
+
+    switch (i) {
+        case 0: return glm::vec3(v, t, p);
+        case 1: return glm::vec3(q, v, p);
+        case 2: return glm::vec3(p, v, t);
+        case 3: return glm::vec3(p, q, v);
+        case 4: return glm::vec3(t, p, v);
+        case 5: return glm::vec3(v, p, q);
+    }
+    return glm::vec3(1, 1, 1);
+}
+
+void Scene_Renderer::draw_hud(VkExtent2D extent) {
     renderer_2d->draw_quad(globals.white_texture, {50, 50}, {64, 64}, FLIP_MODE_NONE, NULL, {1, 0.5f, 0.2f, 1});
+
+    int pad = (int)(0.0025f * extent.width);
+    
+    int font_size = (int)(0.04f * extent.height);
+    Dynamic_Font *font = get_font_at_size("KarminaBoldItalic", font_size);
+    char *text = "Slavchi e gei!";
+    int x = extent.width  - font->get_string_width_in_pixels(text) - pad;
+    int y = extent.height - font->character_height;
+
+    float t = (float)nanoseconds_to_seconds(globals.time_info.real_world_time);
+    glm::vec3 rgb = hsv_to_rgb(glm::vec3(fmodf(t * 0.3f, 1.0f), 1.0f, 1.0f));
+    glm::vec4 color = glm::vec4(rgb, 1.0f);
+
+    glm::vec4 shadow_color = glm::vec4(0, 0, 0, 1);
+    int offset = font->character_height / 20;
+
+    if (offset) {
+        renderer_2d->draw_text(font, text, x-offset, y, glm::vec4(0,0,0,1));
+        renderer_2d->draw_text(font, text, x+offset, y, glm::vec4(0,0,0,1));
+        renderer_2d->draw_text(font, text, x, y-offset, glm::vec4(0,0,0,1));
+        renderer_2d->draw_text(font, text, x, y+offset, glm::vec4(0,0,0,1));
+        renderer_2d->draw_text(font, text, x-offset, y-offset, glm::vec4(0,0,0,1));
+        renderer_2d->draw_text(font, text, x+offset, y-offset, glm::vec4(0,0,0,1));
+        renderer_2d->draw_text(font, text, x-offset, y+offset, glm::vec4(0,0,0,1));
+        renderer_2d->draw_text(font, text, x+offset, y+offset, glm::vec4(0,0,0,1));
+    }
+    
+    renderer_2d->draw_text(font, text, x, y, color);
 }

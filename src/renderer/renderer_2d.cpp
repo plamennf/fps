@@ -253,3 +253,16 @@ void Renderer_2D::draw_quad(Texture *texture, glm::vec2 position, glm::vec2 size
     num_quad_vertices += 4;
     num_quad_indices  += 6;
 }
+
+void Renderer_2D::draw_text(Dynamic_Font *font, char *text, int x, int y, glm::vec4 color) {
+    font->prep_text(text, x, y);
+
+    for (Font_Quad quad : font->font_quads) {
+        glm::vec2 position = glm::vec2(quad.position_x, quad.position_y);
+        glm::vec2 size     = glm::vec2(quad.size_x, quad.size_y);
+        
+        draw_quad(quad.texture, position, size, FLIP_MODE_VERTICALLY, &quad.src_rect, color);
+    }
+
+    font->font_quads.clear();
+}
