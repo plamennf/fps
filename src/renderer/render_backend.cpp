@@ -1271,6 +1271,8 @@ bool Render_Backend::load_texture(Texture *texture, char *filepath) {
 
 bool Render_Backend::create_framebuffer(Texture *texture, int width, int height, VkFormat format) {
     bool is_depth = format == VK_FORMAT_D32_SFLOAT;
+
+    texture->format = format;
     
     VkImageCreateInfo image_info = {};
     image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -1283,7 +1285,7 @@ bool Render_Backend::create_framebuffer(Texture *texture, int width, int height,
     image_info.format = format;
     image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    image_info.usage = is_depth ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT : VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    image_info.usage = (is_depth ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT : VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) | VK_IMAGE_USAGE_SAMPLED_BIT;
     image_info.samples = VK_SAMPLE_COUNT_1_BIT;
     image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
@@ -1308,6 +1310,23 @@ bool Render_Backend::create_framebuffer(Texture *texture, int width, int height,
 
     texture->width  = width;
     texture->height = height;
+
+    VkSamplerCreateInfo sampler_info = {};
+    sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    sampler_info.minFilter = VK_FILTER_LINEAR;
+    sampler_info.magFilter = VK_FILTER_LINEAR;
+    sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    sampler_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    sampler_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    sampler_info.maxAnisotropy = 1;
+    sampler_info.compareOp = VK_COMPARE_OP_ALWAYS;
+    sampler_info.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+
+    if (vkCreateSampler(device, &sampler_info, VK_NULL_HANDLE, &texture->sampler) != VK_SUCCESS) {
+        logprintf("Failed to create framebuffer texture sampler!\n");
+        return false;
+    }
     
     return true;
 }

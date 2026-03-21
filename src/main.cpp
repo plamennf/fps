@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "main.h"
 #include "renderer/render_backend.h"
+#include "renderer/renderer_2d.h"
 #include "renderer/scene_renderer.h"
 #include "renderer/texture_registry.h"
 #include "renderer/mesh_registry.h"
@@ -165,9 +166,14 @@ int main(int argc, char *argv[]) {
     defer { globals.render_backend->device_wait_idle(); };
 
     globals.render_backend->imgui_init();
+
+    globals.renderer_2d = new Renderer_2D();
+    if (!globals.renderer_2d->init(globals.render_backend)) {
+        return 1;
+    }
     
     globals.scene_renderer = new Scene_Renderer();
-    if (!globals.scene_renderer->init(globals.render_backend)) {
+    if (!globals.scene_renderer->init(globals.render_backend, globals.renderer_2d)) {
         return 1;
     }
     
@@ -400,6 +406,7 @@ int main(int argc, char *argv[]) {
             globals.scene_renderer->add_render_entity(mesh, {0, 0, 10}, {0, 0, 0}, glm::vec3(scale), glm::vec4(1));
         
             globals.scene_renderer->render();
+            globals.renderer_2d->end_frame();
             
             if (vkEndCommandBuffer(cb) != VK_SUCCESS) {
                 logprintf("Failed to record command buffer!\n");

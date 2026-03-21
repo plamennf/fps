@@ -45,13 +45,14 @@ struct Gpu_Buffer {
 };
 
 struct Texture {
-    int width;
-    int height;
+    int width = 0;
+    int height = 0;
     
     VkImage image = VK_NULL_HANDLE;
     VmaAllocation allocation = {};
     VkImageView view = VK_NULL_HANDLE;
     VkSampler sampler = VK_NULL_HANDLE;
+    VkFormat format = VK_FORMAT_UNDEFINED;
 };
 
 enum Render_Vertex_Type {
@@ -107,6 +108,14 @@ struct Render_Backend {
     VkImageView get_current_swap_chain_image_view();
     inline VkExtent2D get_swap_chain_extent() { return swap_chain_extent; }
     inline VkFormat get_swap_chain_surface_format() { return swap_chain_surface_format.format; };
+    inline Texture get_current_back_buffer() {
+        Texture result;
+
+        result.image = get_current_swap_chain_image();
+        result.view  = get_current_swap_chain_image_view();
+
+        return result;
+    }
     
     bool create_buffer(Gpu_Buffer *buffer, VkBufferUsageFlagBits buffer_type, VkDeviceSize size, void *initial_data);
     bool update_buffer(Gpu_Buffer *buffer, VkDeviceSize offset, VkDeviceSize size, void *data);

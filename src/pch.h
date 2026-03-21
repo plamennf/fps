@@ -42,3 +42,9 @@ namespace glm {
     
 }
 
+struct Rectangle2i {
+    int x;
+    int y;
+    int width;
+    int height;
+};

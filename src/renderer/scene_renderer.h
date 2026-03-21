@@ -6,6 +6,8 @@
 struct Mesh;
 struct Submesh;
 
+struct Renderer_2D;
+
 const int MAX_LIGHTS = 8;
 
 enum Light_Type : int {
@@ -61,7 +63,7 @@ struct Render_Entity {
 struct Scene_Renderer {
     static const int MAX_RENDER_ENTITIES = 1024;
     
-    bool init(Render_Backend *backend);
+    bool init(Render_Backend *backend, Renderer_2D *renderer_2d);
 
     void destroy_framebuffers();
     bool init_framebuffers();
@@ -74,9 +76,17 @@ struct Scene_Renderer {
 
 private:
     void generate_gpu_data_for_submesh(Submesh *submesh);
+
+    void render_all_entities(VkCommandBuffer cb);
+
+    void begin_rendering(VkCommandBuffer cb, Texture *color_target, Texture *depth_target, VkExtent2D extent, glm::vec4 clear_color, float z, u8 stencil);
+    void end_rendering(VkCommandBuffer cb);
     
 private:
     Render_Backend *backend = NULL;
+    Renderer_2D *renderer_2d = NULL;
+    
+    Texture offscreen_buffer;
     Texture depth_buffer;
     
     eastl::vector <Render_Entity> render_entities;
@@ -94,4 +104,6 @@ private:
 
     VkPipelineLayout mesh_pipeline_layout;
     VkPipeline mesh_pipeline;
+
+    VkPipeline resolve_pipeline;
 };

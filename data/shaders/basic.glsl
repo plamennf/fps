@@ -1,5 +1,3 @@
-// file: mesh_shader.glsl
-
 #version 450
 
 layout(location = 0) COMM vec2 frag_uv;

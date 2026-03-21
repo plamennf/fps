@@ -1,12 +1,14 @@
 #include "pch.h"
 #include "scene_renderer.h"
+#include "renderer_2d.h"
 #include "mesh.h"
 #include "../main.h"
 #include "texture_registry.h"
 #include "mesh_registry.h"
 
-bool Scene_Renderer::init(Render_Backend *_backend) {
+bool Scene_Renderer::init(Render_Backend *_backend, Renderer_2D *_renderer_2d) {
     backend = _backend;
+    renderer_2d = _renderer_2d;
 
     if (!init_framebuffers()) {
         return false;
@@ -95,7 +97,6 @@ bool Scene_Renderer::init(Render_Backend *_backend) {
     }
     
     Graphics_Pipeline_Info mesh_pipepline_info = {};
-    
     mesh_pipepline_info.pipeline_layout = mesh_pipeline_layout;
     mesh_pipepline_info.shader_filename = "basic";
     mesh_pipepline_info.vertex_type     = RENDER_VERTEX_MESH;
@@ -103,11 +104,22 @@ bool Scene_Renderer::init(Render_Backend *_backend) {
     mesh_pipepline_info.cull_mode       = CULL_MODE_BACK;
     mesh_pipepline_info.depth_test_mode = DEPTH_TEST_MODE_LEQUAL;
     mesh_pipepline_info.depth_write     = true;
-    
-    mesh_pipepline_info.color_attachment_format = backend->get_swap_chain_surface_format();
-    mesh_pipepline_info.depth_attachment_format = VK_FORMAT_D32_SFLOAT;
-    
+    mesh_pipepline_info.color_attachment_format = offscreen_buffer.format;
+    mesh_pipepline_info.depth_attachment_format = VK_FORMAT_D32_SFLOAT;    
     if (!backend->create_graphics_pipeline(mesh_pipepline_info, &mesh_pipeline)) {
+        return false;
+    }
+
+    Graphics_Pipeline_Info resolve_pipepline_info = {};    
+    resolve_pipepline_info.pipeline_layout = renderer_2d->quad_pipeline_layout;
+    resolve_pipepline_info.shader_filename = "resolve";
+    resolve_pipepline_info.vertex_type     = RENDER_VERTEX_IMMEDIATE;
+    resolve_pipepline_info.blend_mode      = BLEND_MODE_ALPHA;
+    resolve_pipepline_info.cull_mode       = CULL_MODE_NONE;
+    resolve_pipepline_info.depth_test_mode = DEPTH_TEST_MODE_OFF;
+    resolve_pipepline_info.depth_write     = false;    
+    resolve_pipepline_info.color_attachment_format = backend->get_swap_chain_surface_format();    
+    if (!backend->create_graphics_pipeline(resolve_pipepline_info, &resolve_pipeline)) {
         return false;
     }
     
@@ -118,13 +130,21 @@ void Scene_Renderer::destroy_framebuffers() {
     if (depth_buffer.image) {
         backend->destroy_texture(&depth_buffer);
     }
+
+    if (offscreen_buffer.image) {
+        backend->destroy_texture(&offscreen_buffer);
+    }
 }
 
 bool Scene_Renderer::init_framebuffers() {
     if (!backend->create_framebuffer(&depth_buffer, backend->get_swap_chain_extent().width, backend->get_swap_chain_extent().height, VK_FORMAT_D32_SFLOAT)) {
         return false;
     }
-
+    
+    if (!backend->create_framebuffer(&offscreen_buffer, backend->get_swap_chain_extent().width, backend->get_swap_chain_extent().height, VK_FORMAT_R16G16B16A16_SFLOAT)) {
+        return false;
+    }
+    
     return true;
 }
 
@@ -133,60 +153,9 @@ void Scene_Renderer::render() {
     
     VkCommandBuffer cb = backend->get_current_command_buffer(false);
     
-    VkImageSubresourceRange color_range = {};
-    color_range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    color_range.levelCount = VK_REMAINING_MIP_LEVELS;
-    color_range.layerCount = VK_REMAINING_ARRAY_LAYERS;
-    backend->image_layout_transition(cb, backend->get_current_swap_chain_image(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, color_range);
-
-    backend->image_layout_transition(cb, depth_buffer.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, { VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1 });
-    
-    VkClearValue clear_color = {{{0.2f, 0.5f, 0.8f, 1.0f}}};
-    VkClearValue clear_depth = {};
-    clear_depth.depthStencil = { 1.0f, 0 };
-    
-    VkRenderingAttachmentInfoKHR color_attachment_info = {};
-    color_attachment_info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
-    color_attachment_info.imageView = backend->get_current_swap_chain_image_view();
-    color_attachment_info.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    color_attachment_info.resolveMode = VK_RESOLVE_MODE_NONE;
-    color_attachment_info.loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    color_attachment_info.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;
-    color_attachment_info.clearValue  = clear_color;
-
-    VkRenderingAttachmentInfo depth_attachment_info = {};
-    depth_attachment_info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    depth_attachment_info.imageView = depth_buffer.view;
-    depth_attachment_info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
-    depth_attachment_info.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    depth_attachment_info.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    depth_attachment_info.clearValue = clear_depth;
-    
     VkExtent2D extent = backend->get_swap_chain_extent();
-    
-    VkRenderingInfoKHR rendering_info = {};
-    rendering_info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO_KHR;
-    rendering_info.renderArea.offset = {0, 0};
-    rendering_info.renderArea.extent = extent;
-    rendering_info.colorAttachmentCount = 1;
-    rendering_info.pColorAttachments = &color_attachment_info;
-    rendering_info.pDepthAttachment = &depth_attachment_info;
-    rendering_info.layerCount = 1;
-    vkCmdBeginRendering(cb, &rendering_info);
 
-    VkViewport viewport = {};
-    viewport.x = 0.0f;
-    viewport.y = 0.0f;
-    viewport.width = (float)extent.width;
-    viewport.height = (float)extent.height;
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-    vkCmdSetViewport(cb, 0, 1, &viewport);
-
-    VkRect2D scissor = {};
-    scissor.offset = {0, 0};
-    scissor.extent = extent;
-    vkCmdSetScissor(cb, 0, 1, &scissor);
+    begin_rendering(cb, &offscreen_buffer, &depth_buffer, extent, glm::vec4(0.2f, 0.5f, 0.8f, 1.0f), 1.0f, 0);
 
     float aspect_ratio = extent.width / (extent.height > 0 ? (float)extent.height : 1.0f);
     glm::mat4 projection_matrix = glm::perspective(glm::radians(90.0f), aspect_ratio, 0.1f, 1000.0f);
@@ -207,38 +176,27 @@ void Scene_Renderer::render() {
     vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh_pipeline);
 
     vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh_pipeline_layout, 0, 1, &per_scene_uniforms_descriptor_sets[backend->current_frame], 0, NULL);
+
+    render_all_entities(cb);
+
+    end_rendering(cb);
+
+    VkImageSubresourceRange color_range = {};
+    color_range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    color_range.levelCount = VK_REMAINING_MIP_LEVELS;
+    color_range.layerCount = VK_REMAINING_ARRAY_LAYERS;
+    backend->image_layout_transition(cb, offscreen_buffer.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, color_range);
     
-    for (int i = 0; i < render_entities.size(); i++) {
-        MyZoneScopedN("Draw single mesh");
-        
-        auto const &entity = render_entities[i];
+    Texture back_buffer = backend->get_current_back_buffer();
+    begin_rendering(cb, &back_buffer, NULL, extent, glm::vec4(0, 0, 0, 1), 1.0f, 0);
 
-        Per_Object_Uniforms per_object_uniforms = {};
+    renderer_2d->begin_2d(extent, resolve_pipeline);
+    renderer_2d->draw_quad(&offscreen_buffer, {0, 0}, {(float)extent.width, (float)extent.height}, FLIP_MODE_VERTICALLY, NULL, glm::vec4(1, 1, 1, 1));
+    renderer_2d->end_2d(cb);
 
-        per_object_uniforms.world_matrix = entity.world_matrix;
-        per_object_uniforms.scale_color  = entity.scale_color;
-        
-        vkCmdPushConstants(cb, mesh_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(Per_Object_Uniforms), &per_object_uniforms);
-        
-        Mesh *mesh = entity.mesh;
-        for (int i = 0; i < mesh->num_submeshes; i++) {
-            Submesh *submesh = &mesh->submeshes[i];
-            if (!submesh->has_gpu_data) {
-                generate_gpu_data_for_submesh(submesh);
-                if (!submesh->has_gpu_data) continue;
-            }
-
-            MyZoneScopedN("Draw one submesh");
-            
-            vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh_pipeline_layout, 1, 1, &submesh->material.descriptor_set, 0, NULL);
-
-            VkDeviceSize offset = 0;
-            vkCmdBindVertexBuffers(cb, 0, 1, &submesh->vertex_buffer.buffer, &offset);
-            vkCmdBindIndexBuffer(cb, submesh->index_buffer.buffer, 0, VK_INDEX_TYPE_UINT32);
-
-            vkCmdDrawIndexed(cb, submesh->num_indices, 1, 0, 0, 0);
-        }
-    }
+    renderer_2d->begin_2d(extent);
+    renderer_2d->draw_quad(globals.white_texture, {50, 50}, {64, 64}, FLIP_MODE_NONE, NULL, {1, 0.5f, 0.2f, 1});
+    renderer_2d->end_2d(cb);
     
     // TODO: Move this out of here eventually. It's here because it needs to be between vkCmdBeginRendering and vkCmdEndRendering
     {
@@ -260,7 +218,7 @@ void Scene_Renderer::render() {
         globals.render_backend->imgui_end_frame(cb);
     }
 
-    vkCmdEndRendering(cb);
+    end_rendering(cb);
 
     backend->image_layout_transition(cb, backend->get_current_swap_chain_image(), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, color_range);
 
@@ -348,4 +306,107 @@ void Scene_Renderer::generate_gpu_data_for_submesh(Submesh *submesh) {
     backend->update_descriptor_set(submesh->material.descriptor_set, 5, submesh->material.emissive_texture);
 
     submesh->has_gpu_data = true;
+}
+
+void Scene_Renderer::render_all_entities(VkCommandBuffer cb) {
+    for (int i = 0; i < render_entities.size(); i++) {
+        MyZoneScopedN("Draw single mesh");
+        
+        auto const &entity = render_entities[i];
+
+        Per_Object_Uniforms per_object_uniforms = {};
+
+        per_object_uniforms.world_matrix = entity.world_matrix;
+        per_object_uniforms.scale_color  = entity.scale_color;
+        
+        vkCmdPushConstants(cb, mesh_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(Per_Object_Uniforms), &per_object_uniforms);
+        
+        Mesh *mesh = entity.mesh;
+        for (int i = 0; i < mesh->num_submeshes; i++) {
+            Submesh *submesh = &mesh->submeshes[i];
+            if (!submesh->has_gpu_data) {
+                generate_gpu_data_for_submesh(submesh);
+                if (!submesh->has_gpu_data) continue;
+            }
+
+            MyZoneScopedN("Draw one submesh");
+            
+            vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh_pipeline_layout, 1, 1, &submesh->material.descriptor_set, 0, NULL);
+
+            VkDeviceSize offset = 0;
+            vkCmdBindVertexBuffers(cb, 0, 1, &submesh->vertex_buffer.buffer, &offset);
+            vkCmdBindIndexBuffer(cb, submesh->index_buffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+
+            vkCmdDrawIndexed(cb, submesh->num_indices, 1, 0, 0, 0);
+        }
+    }
+}
+
+void Scene_Renderer::begin_rendering(VkCommandBuffer cb, Texture *color_target, Texture *depth_target, VkExtent2D extent, glm::vec4 _clear_color, float z, u8 stencil) {
+    VkClearValue clear_color;
+    clear_color.color.float32[0] = _clear_color.r;
+    clear_color.color.float32[1] = _clear_color.g;
+    clear_color.color.float32[2] = _clear_color.b;
+    clear_color.color.float32[3] = _clear_color.a;
+
+    VkClearValue clear_depth;
+    clear_depth.depthStencil.depth   = z;
+    clear_depth.depthStencil.stencil = stencil;
+    
+    VkRenderingAttachmentInfoKHR color_attachment_info = {}, depth_attachment_info = {};
+    if (color_target) {
+        VkImageSubresourceRange color_range = {};
+        color_range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        color_range.levelCount = VK_REMAINING_MIP_LEVELS;
+        color_range.layerCount = VK_REMAINING_ARRAY_LAYERS;
+        backend->image_layout_transition(cb, color_target->image, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, color_range);
+
+        color_attachment_info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
+        //color_attachment_info.imageView = backend->get_current_swap_chain_image_view();
+        color_attachment_info.imageView   = color_target->view;
+        color_attachment_info.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        color_attachment_info.resolveMode = VK_RESOLVE_MODE_NONE;
+        color_attachment_info.loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        color_attachment_info.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;
+        color_attachment_info.clearValue  = clear_color;
+    }
+    
+    if (depth_target) {
+        backend->image_layout_transition(cb, depth_target->image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, { VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1 });
+
+        depth_attachment_info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+        depth_attachment_info.imageView = depth_target->view;
+        depth_attachment_info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+        depth_attachment_info.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        depth_attachment_info.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        depth_attachment_info.clearValue = clear_depth;
+    }
+
+    VkRenderingInfoKHR rendering_info = {};
+    rendering_info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO_KHR;
+    rendering_info.renderArea.offset = {0, 0};
+    rendering_info.renderArea.extent = extent;
+    rendering_info.layerCount = 1;
+    rendering_info.colorAttachmentCount = color_target ? 1 : 0;
+    rendering_info.pColorAttachments = color_target ? &color_attachment_info : NULL;
+    rendering_info.pDepthAttachment = depth_target ? &depth_attachment_info : NULL;
+    vkCmdBeginRendering(cb, &rendering_info);
+    
+    VkViewport viewport = {};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = (float)extent.width;
+    viewport.height = (float)extent.height;
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    vkCmdSetViewport(cb, 0, 1, &viewport);
+
+    VkRect2D scissor = {};
+    scissor.offset = {0, 0};
+    scissor.extent = extent;
+    vkCmdSetScissor(cb, 0, 1, &scissor);
+}
+
+void Scene_Renderer::end_rendering(VkCommandBuffer cb) {
+    vkCmdEndRendering(cb);
 }

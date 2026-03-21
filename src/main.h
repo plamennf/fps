@@ -4,6 +4,7 @@
 
 struct SDL_Window;
 struct Render_Backend;
+struct Renderer_2D;
 struct Scene_Renderer;
 struct Texture;
 
@@ -35,6 +36,7 @@ struct Global_Variables {
     Memory_Arena frame_memory;
 
     Render_Backend *render_backend = NULL;
+    Renderer_2D    *renderer_2d    = NULL;
     Scene_Renderer *scene_renderer = NULL;
     
     Texture_Registry *texture_registry = NULL;
