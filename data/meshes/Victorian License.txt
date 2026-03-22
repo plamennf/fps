@@ -1,8 +1,0 @@
-Model Information:
-* title:	Victorian era architecture
-* source:	https://sketchfab.com/3d-models/victorian-era-architecture-c4eaefd7054d41259776defa98e28ad8
-* author:	abhayexe (https://sketchfab.com/abhayexe)
-
-Model License:
-* license type:	SKETCHFAB Standard (https://sketchfab.com/licenses)
-* requirements:	Under basic restrictions, use worldwide, on all types of media, commercially or not, and in all types of derivative works

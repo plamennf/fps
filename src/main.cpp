@@ -184,13 +184,13 @@ int main(int argc, char *argv[]) {
     globals.white_texture = new Texture();
     if (!globals.render_backend->create_texture(globals.white_texture, 1, 1, VK_FORMAT_R8G8B8A8_SRGB, white_texture_data, "white_texture")) return 1;
     
-    Mesh *building = globals.mesh_registry->find_or_load("Victorian");
+    Mesh *building = globals.mesh_registry->find_or_load("BirchTree_5");
     if (!building) return 1;
 
-    Mesh *cube = globals.mesh_registry->find_or_load("Cube");
+    Mesh *cube = globals.mesh_registry->find_or_load("RockPath_Square_Wide");
     if (!cube) return 1;
 
-    Mesh *mesh = globals.mesh_registry->find_or_load("Zoro");
+    Mesh *mesh = globals.mesh_registry->find_or_load("MapleTree_5");
     if (!mesh) return 1;
 
     SDL_SetRelativeMouseMode(SDL_TRUE);

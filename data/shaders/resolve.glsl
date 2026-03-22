@@ -28,12 +28,21 @@ layout(location = 0) out vec4 output_color;
 
 layout(set = 1, binding = 0) uniform sampler2D hdr_texture;
 
+vec3 aces(vec3 x) {
+    float a = 2.51;
+    float b = 0.03;
+    float c = 2.43;
+    float d = 0.59;
+    float e = 0.14;
+    return clamp((x*(a*x+b))/(x*(c*x+d)+e), 0.0, 1.0);
+}
+
 void main() {
     float exposure = 2.0;
 
     vec4 hdr_color = texture(hdr_texture, frag_uv);
 
-    vec3 mapped = 1.0 - exp(-hdr_color.rgb * exposure);
+    vec3 mapped = aces(hdr_color.rgb * exposure);
     output_color = vec4(mapped, 1.0);
 }
 
