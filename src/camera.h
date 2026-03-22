@@ -12,6 +12,10 @@ struct Camera {
     glm::vec3 target;
     glm::vec3 up;
 
+    float smoothed_mouse_x = 0;
+    float smoothed_mouse_y = 0;
+    float smoothing_factor = 0.4f;
+    
     float pitch;
     float yaw;
     float roll;

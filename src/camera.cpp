@@ -16,10 +16,13 @@ void init_camera(Camera *camera, glm::vec3 position, float pitch, float yaw, flo
 }
 
 void update_camera_fps(Camera *camera, float dt) {
+    camera->smoothed_mouse_x = glm::mix(camera->smoothed_mouse_x, (float)globals.mouse_cursor_x_delta, camera->smoothing_factor);
+    camera->smoothed_mouse_y = glm::mix(camera->smoothed_mouse_y, (float)globals.mouse_cursor_y_delta, camera->smoothing_factor);
+    
     float sensitivity = globals.mouse_sensitivity;
     
-    camera->yaw   += globals.mouse_cursor_x_delta * sensitivity;
-    camera->pitch += globals.mouse_cursor_y_delta * sensitivity;
+    camera->yaw   += camera->smoothed_mouse_x * sensitivity;
+    camera->pitch += camera->smoothed_mouse_y * sensitivity;
 
     if (camera->pitch > 89.0f) {
         camera->pitch = 89.0f;
