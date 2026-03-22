@@ -639,6 +639,10 @@ void Scene_Renderer::update_shadow_map_cascade_matrices(Per_Scene_Uniforms *unif
         max_x = floorf(max_x / world_units_per_texel) * world_units_per_texel;
         min_y = floorf(min_y / world_units_per_texel) * world_units_per_texel;
         max_y = floorf(max_y / world_units_per_texel) * world_units_per_texel;
+
+        float z_pad = 500.0f;
+        max_z += z_pad;
+        min_z -= z_pad;
         
         glm::mat4 light_proj = glm::ortho(min_x, max_x, max_y, min_y, -max_z, -min_z);
         

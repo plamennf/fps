@@ -1,4 +1,5 @@
 #define MAX_SHADOW_CASCADES 4
+//#define DISABLE_SHADOW_BLEND
 
 #define SHADOW_MAP_WIDTH  4096
 #define SHADOW_MAP_HEIGHT 4096
@@ -87,7 +88,7 @@ struct Cascade_Data {
 
 Cascade_Data get_cascade_blend(float depth) {
     Cascade_Data data;
-    const float delta = 20.0;
+    const float delta = 10.0;
     data.index0 = 0;
     data.index1 = 0;
     data.blend  = 0.0;
@@ -174,17 +175,8 @@ float pcf_shadow(vec3 proj_coords, int cascade_index, float bias) {
 }
 
 float calculate_shadow(int cascade_index, vec3 world_position, float bias) {
-    vec4 shadow_pos;
-
-    switch (cascade_index) {
-        case 0: shadow_pos = (per_scene.light_matrix[0] * vec4(world_position, 1.0)); break;
-        case 1: shadow_pos = (per_scene.light_matrix[1] * vec4(world_position, 1.0)); break;
-        case 2: shadow_pos = (per_scene.light_matrix[2] * vec4(world_position, 1.0)); break;
-        case 3: shadow_pos = (per_scene.light_matrix[3] * vec4(world_position, 1.0)); break;
-
-        default: shadow_pos = vec4(0.0, 0.0, 0.0, 1.0); break;
-    }
-
+    vec4 shadow_pos = per_scene.light_matrix[cascade_index] * vec4(world_position, 1.0);
+    
     vec3 proj_coords = shadow_pos.xyz / shadow_pos.w;
     proj_coords.x = proj_coords.x * 0.5 + 0.5;
     //proj_coords.y = proj_coords.y * -0.5 + 0.5; // This is for directx 11
@@ -267,7 +259,9 @@ vec3 calculate_lighting(vec2 frag_uv, vec4 frag_color, vec3 world_normal, mat3 T
         N = normalize(TBN * normal);
     }
 
-    //int cascade_index = calculate_cascade_index(world_position, per_scene.camera_position);
+#ifdef DISABLE_SHADOW_BLEND
+    int cascade_index = calculate_cascade_index(world_position, per_scene.camera_position);
+#endif
     
     vec3 Lo = vec3(0, 0, 0);
     for (int i = 0; i < MAX_LIGHTS; i++) {
@@ -282,13 +276,15 @@ vec3 calculate_lighting(vec2 frag_uv, vec4 frag_color, vec3 world_normal, mat3 T
                 L = normalize(-light.direction);
                 //float bias = 0.01;
                 float bias = max(0.0005 * (1.0 - dot(N, L)), 0.01);
-                //s = calculate_shadow(cascade_index, world_position, bias);
-
+#ifdef DISABLE_SHADOW_BLEND
+                s = calculate_shadow(cascade_index, world_position, bias);
+#else
                 vec3 view_pos = (per_scene.view * vec4(world_position, 1.0)).xyz;
                 Cascade_Data cascade = get_cascade_blend(-view_pos.z);
                 float s0 = calculate_shadow(cascade.index0, world_position, bias);
                 float s1 = calculate_shadow(cascade.index1, world_position, bias);
                 s  = mix(s0, s1, cascade.blend);
+#endif
             } break;
 
             case LIGHT_TYPE_POINT: {
