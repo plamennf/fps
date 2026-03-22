@@ -184,15 +184,6 @@ int main(int argc, char *argv[]) {
     u8 white_texture_data[4] = { 0xFF, 0xFF, 0xFF, 0xFF };
     globals.white_texture = new Texture();
     if (!globals.render_backend->create_texture(globals.white_texture, 1, 1, VK_FORMAT_R8G8B8A8_SRGB, white_texture_data, "white_texture")) return 1;
-    
-    Mesh *building = globals.mesh_registry->find_or_load("BirchTree_5");
-    if (!building) return 1;
-
-    Mesh *cube = globals.mesh_registry->find_or_load("RockPath_Square_Wide");
-    if (!cube) return 1;
-
-    Mesh *mesh = globals.mesh_registry->find_or_load("MapleTree_5");
-    if (!mesh) return 1;
 
     SDL_SetRelativeMouseMode(SDL_TRUE);
 
@@ -202,7 +193,7 @@ int main(int argc, char *argv[]) {
 
     Terrain_Chunk chunk;
     //chunk.generate(128, 1.0f, glm::vec3(0.0f), 100000);
-    chunk.generate(128, 1.0f, glm::vec3(0.0f), 10000);
+    chunk.generate(128, 4.0f, glm::vec3(0.0f), 10000);
     
     float accumulated_dt = 0.0f;
     float fixed_update_dt = 1.0f / 60.0f;
@@ -403,15 +394,7 @@ int main(int argc, char *argv[]) {
             globals.scene_renderer->add_light(spot_light);
 
             globals.scene_renderer->add_terrain_chunk(&chunk);
-            
-            //globals.scene_renderer->add_render_entity(cube, {-50, -1, -50}, {0, 0, 0}, {100, 1, 100}, {1, 1, 1, 1});
-
-            float scale = 10.0f;
-            globals.scene_renderer->add_render_entity(building, {0, 0.1f, -10}, {0, 0, 0}, glm::vec3(scale), glm::vec4(1));
-
-            scale = 1.0f;
-            globals.scene_renderer->add_render_entity(mesh, {0, 0, 10}, {0, 0, 0}, glm::vec3(scale), glm::vec4(1));
-        
+                    
             globals.scene_renderer->render();
             globals.renderer_2d->end_frame();
             

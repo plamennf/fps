@@ -56,7 +56,7 @@ private:
     Texture depth_buffer;
     Texture shadow_map_buffers[MAX_SHADOW_CASCADES];
     
-    float shadow_cascade_splits[MAX_SHADOW_CASCADES] = { 10.0f, 25.0f, 60.0f, 100.0f };
+    float shadow_cascade_splits[MAX_SHADOW_CASCADES] = { 64.0f, 131.0f, 221.0f, 508.0f };
     
     eastl::vector <Render_Entity> render_entities;
     eastl::vector <Terrain_Chunk> terrain_chunks;

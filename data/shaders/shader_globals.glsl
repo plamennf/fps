@@ -79,6 +79,42 @@ layout(set = 0, binding = 2) uniform sampler2D shadow_map_1;
 layout(set = 0, binding = 3) uniform sampler2D shadow_map_2;
 layout(set = 0, binding = 4) uniform sampler2D shadow_map_3;
 
+struct Cascade_Data {
+    int index0;
+    int index1;
+    float blend;
+};
+
+Cascade_Data get_cascade_blend(float depth) {
+    Cascade_Data data;
+    const float delta = 20.0;
+    data.index0 = 0;
+    data.index1 = 0;
+    data.blend  = 0.0;
+
+    for (int i = 0; i < MAX_SHADOW_CASCADES-1; i++) {
+        float split_near = per_scene.cascade_splits[i].x - delta;
+        float split_far  = per_scene.cascade_splits[i].x + delta;
+
+        if (depth < split_near) {
+            data.index0 = i;
+            data.index1 = i;
+            data.blend  = 0.0;
+            return data;
+        } else if (depth < split_far) {
+            data.index0 = i;
+            data.index1 = i+1;
+            data.blend  = smoothstep(split_near, split_far, depth);
+            return data;
+        }
+    }
+
+    data.index0 = MAX_SHADOW_CASCADES-1;
+    data.index1 = MAX_SHADOW_CASCADES-1;
+    data.blend  = 0.0;
+    return data;
+}
+
 int calculate_cascade_index(vec3 world_position, vec3 camera_position) {
     //float depth = length(world_position - camera_position);
     vec3 view_pos = (per_scene.view * vec4(world_position, 1.0)).xyz;
@@ -231,7 +267,7 @@ vec3 calculate_lighting(vec2 frag_uv, vec4 frag_color, vec3 world_normal, mat3 T
         N = normalize(TBN * normal);
     }
 
-    int cascade_index = calculate_cascade_index(world_position, per_scene.camera_position);
+    //int cascade_index = calculate_cascade_index(world_position, per_scene.camera_position);
     
     vec3 Lo = vec3(0, 0, 0);
     for (int i = 0; i < MAX_LIGHTS; i++) {
@@ -246,7 +282,13 @@ vec3 calculate_lighting(vec2 frag_uv, vec4 frag_color, vec3 world_normal, mat3 T
                 L = normalize(-light.direction);
                 //float bias = 0.01;
                 float bias = max(0.0005 * (1.0 - dot(N, L)), 0.01);
-                s = calculate_shadow(cascade_index, world_position, bias);
+                //s = calculate_shadow(cascade_index, world_position, bias);
+
+                vec3 view_pos = (per_scene.view * vec4(world_position, 1.0)).xyz;
+                Cascade_Data cascade = get_cascade_blend(-view_pos.z);
+                float s0 = calculate_shadow(cascade.index0, world_position, bias);
+                float s1 = calculate_shadow(cascade.index1, world_position, bias);
+                s  = mix(s0, s1, cascade.blend);
             } break;
 
             case LIGHT_TYPE_POINT: {
