@@ -5,6 +5,7 @@
 #include "renderer/scene_renderer.h"
 #include "renderer/texture_registry.h"
 #include "renderer/mesh_registry.h"
+#include "terrain.h"
 
 #include <SDL.h>
 #include <imgui_impl_sdl2.h>
@@ -198,6 +199,9 @@ int main(int argc, char *argv[]) {
     if (start_fullscreen) {
         toggle_fullscreen(globals.window);
     }
+
+    Terrain_Chunk chunk;
+    chunk.generate(128, 1.0f, glm::vec3(0.0f));
     
     float accumulated_dt = 0.0f;
     float fixed_update_dt = 1.0f / 60.0f;
@@ -292,7 +296,7 @@ int main(int argc, char *argv[]) {
         
         while (accumulated_dt >= fixed_update_dt) {
             if (!globals.should_show_cursor) {
-                fixed_update_camera(&globals.camera, CAMERA_TYPE_FPS, fixed_update_dt);
+                fixed_update_camera(&globals.camera, CAMERA_TYPE_FPS, fixed_update_dt, &chunk);
             }
             accumulated_dt -= fixed_update_dt;
         }
@@ -396,8 +400,10 @@ int main(int argc, char *argv[]) {
             globals.scene_renderer->add_light(l4);
             globals.scene_renderer->add_light(l5);
             globals.scene_renderer->add_light(spot_light);
+
+            globals.scene_renderer->add_render_entity(&chunk.mesh, {0, 0, 0}, {0, 0, 0}, {1, 1, 1}, {0, 1, 0, 1});
             
-            globals.scene_renderer->add_render_entity(cube, {-50, -1, -50}, {0, 0, 0}, {100, 1, 100}, {1, 1, 1, 1});
+            //globals.scene_renderer->add_render_entity(cube, {-50, -1, -50}, {0, 0, 0}, {100, 1, 100}, {1, 1, 1, 1});
 
             float scale = 10.0f;
             globals.scene_renderer->add_render_entity(building, {0, 0.1f, -10}, {0, 0, 0}, glm::vec3(scale), glm::vec4(1));

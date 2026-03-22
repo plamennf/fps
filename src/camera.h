@@ -1,5 +1,7 @@
 #pragma once
 
+struct Terrain_Chunk;
+
 enum Camera_Type {
     CAMERA_TYPE_FPS,
     CAMERA_TYPE_NOCLIP,
@@ -30,5 +32,5 @@ struct Camera {
 
 void init_camera(Camera *camera, glm::vec3 position, float pitch, float yaw, float roll);
 void update_camera(Camera *camera, Camera_Type type, float dt);
-void fixed_update_camera(Camera *camera, Camera_Type type, float dt);
+void fixed_update_camera(Camera *camera, Camera_Type type, float dt, Terrain_Chunk *chunk);
 glm::mat4 get_view_matrix(Camera *camera);

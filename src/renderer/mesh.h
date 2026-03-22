@@ -19,7 +19,7 @@ struct Material {
     Texture *normal_texture = NULL;
 
     char *metallic_roughness_texture_name = NULL;
-    Texture *metallic_roughness_texture;
+    Texture *metallic_roughness_texture = NULL;
 
     char *ao_texture_name = NULL;
     Texture *ao_texture = NULL;

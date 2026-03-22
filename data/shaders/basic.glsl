@@ -110,12 +110,11 @@ int calculate_cascade_index(vec3 world_position, vec3 camera_position) {
     return index;
 }
 
-float pcf_shadow(vec3 proj_coords, int cascade_index) {
+float pcf_shadow(vec3 proj_coords, int cascade_index, float bias) {
     float shadow = 0.0;
     float total_weight = 0.0;
     
     float current_depth = proj_coords.z;
-    float bias = 0.01;
 
     for (int x = -2; x <= 2; x++) {
         for (int y = -2; y <= 2; y++) {
@@ -156,7 +155,7 @@ float pcf_shadow(vec3 proj_coords, int cascade_index) {
     return shadow;
 }
 
-float calculate_shadow(int cascade_index, vec3 world_position) {
+float calculate_shadow(int cascade_index, vec3 world_position, float bias) {
     vec4 shadow_pos;
 
     switch (cascade_index) {
@@ -173,7 +172,7 @@ float calculate_shadow(int cascade_index, vec3 world_position) {
     //proj_coords.y = proj_coords.y * -0.5 + 0.5; // This is for directx 11
     proj_coords.y = proj_coords.y * 0.5 + 0.5; // This is for vulkan
 
-    float shadow = pcf_shadow(proj_coords, cascade_index);
+    float shadow = pcf_shadow(proj_coords, cascade_index, bias);
     return shadow;
 }
 
@@ -251,7 +250,6 @@ void main() {
     }
 
     int cascade_index = calculate_cascade_index(world_position, per_scene.camera_position);
-    float shadow = calculate_shadow(cascade_index, world_position);
     
     vec3 Lo = vec3(0, 0, 0);
     for (int i = 0; i < MAX_LIGHTS; i++) {
@@ -264,7 +262,9 @@ void main() {
         switch (light.type) {
             case LIGHT_TYPE_DIRECTIONAL: {
                 L = normalize(-light.direction);
-                s = shadow;
+                //float bias = 0.01;
+                float bias = max(0.0005 * (1.0 - dot(N, L)), 0.01);
+                s = calculate_shadow(cascade_index, world_position, bias);
             } break;
 
             case LIGHT_TYPE_POINT: {

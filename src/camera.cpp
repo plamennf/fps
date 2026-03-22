@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "camera.h"
 #include "main.h"
+#include "terrain.h"
 
 #include <SDL_scancode.h>
 
@@ -65,7 +66,7 @@ void update_camera_fps(Camera *camera, float dt) {
     camera->target   = glm::normalize_or_zero(camera->target);
 }
 
-void fixed_update_camera_fps(Camera *camera, float dt) {
+void fixed_update_camera_fps(Camera *camera, float dt, Terrain_Chunk *chunk) {
     if (is_key_down(SDL_SCANCODE_SPACE)) {
         if (camera->is_on_ground) {
             camera->jump_velocity = camera->max_jump_velocity;
@@ -75,10 +76,13 @@ void fixed_update_camera_fps(Camera *camera, float dt) {
 
     camera->jump_velocity -= camera->gravity * dt;
 
-    camera->position.y += camera->jump_velocity;
+    camera->position.y += camera->jump_velocity;// * dt;
+
+    float terrain_height = chunk->get_height(camera->position.x, camera->position.z);
+    float desired_height = terrain_height + camera->head_y;
     
-    if (camera->position.y < camera->head_y) {
-        camera->position.y = camera->head_y;
+    if (camera->position.y < desired_height) {
+        camera->position.y = desired_height;
         camera->is_on_ground = true;
     }
 }
@@ -141,10 +145,10 @@ void update_camera(Camera *camera, Camera_Type type, float dt) {
     }
 }
 
-void fixed_update_camera(Camera *camera, Camera_Type type, float dt) {
+void fixed_update_camera(Camera *camera, Camera_Type type, float dt, Terrain_Chunk *chunk) {
     switch (type) {
         case CAMERA_TYPE_FPS: {
-            fixed_update_camera_fps(camera, dt);
+            fixed_update_camera_fps(camera, dt, chunk);
         } break;
     }
 }
