@@ -701,6 +701,10 @@ static glm::vec3 hsv_to_rgb(const glm::vec3& hsv) {
 void Scene_Renderer::draw_hud(VkExtent2D extent) {
     renderer_2d->draw_quad(globals.white_texture, {50, 50}, {64, 64}, FLIP_MODE_NONE, NULL, {1, 0.5f, 0.2f, 1});
 
+    Texture *circle_texture = globals.texture_registry->find_or_load("circle");
+    float radius = 0.01f * extent.height;
+    renderer_2d->draw_quad(circle_texture, {extent.width * 0.5f - radius, extent.height * 0.5f - radius}, {radius*2, radius*2}, FLIP_MODE_NONE, NULL, {1, 1, 1, 1});
+
     int pad = (int)(0.0025f * extent.width);
     
     int font_size = (int)(0.04f * extent.height);
