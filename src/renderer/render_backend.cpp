@@ -672,14 +672,19 @@ bool Render_Backend::create_graphics_pipeline(Graphics_Pipeline_Info info, VkPip
 
     VkPipelineShaderStageCreateInfo shader_stages[] = {vert_shader_stage_info, frag_shader_stage_info};
 
-    VkVertexInputBindingDescription vertex_binding = {};
-    vertex_binding.binding   = 0;
+    VkVertexInputBindingDescription vertex_bindings[2] = {};
+    int num_vertex_bindings = 1;
+    vertex_bindings[0].binding   = 0;
+    vertex_bindings[1].binding   = 1;
+
+    vertex_bindings[0].stride    = sizeof(Mesh_Vertex);
+    vertex_bindings[1].stride    = sizeof(Per_Object_Uniforms);
 
     eastl::vector<VkVertexInputAttributeDescription> vertex_attributes;
     switch (info.vertex_type) {
         case RENDER_VERTEX_IMMEDIATE: {
-            vertex_binding.stride    = sizeof(Immediate_Vertex);
-
+            vertex_bindings[0].stride    = sizeof(Immediate_Vertex);
+            
             VkVertexInputAttributeDescription attribute = {};
 
             attribute.location = 0;
@@ -699,8 +704,6 @@ bool Render_Backend::create_graphics_pipeline(Graphics_Pipeline_Info info, VkPip
         } break;
 
         case RENDER_VERTEX_MESH: {
-            vertex_binding.stride    = sizeof(Mesh_Vertex);
-
             VkVertexInputAttributeDescription attribute = {};
 
             attribute.location = 0;
@@ -733,14 +736,71 @@ bool Render_Backend::create_graphics_pipeline(Graphics_Pipeline_Info info, VkPip
             attribute.offset   = offsetof(Mesh_Vertex, bitangent);
             vertex_attributes.push_back(attribute);
         } break;
+
+        case RENDER_VERTEX_MESH_INSTANCED: {
+            num_vertex_bindings   = 2;
+
+            VkVertexInputAttributeDescription attribute = {};
+
+            attribute.location = 0;
+            attribute.format   = VK_FORMAT_R32G32B32_SFLOAT;
+            attribute.offset   = offsetof(Mesh_Vertex, position);
+            vertex_attributes.push_back(attribute);
+
+            attribute.location = 1;
+            attribute.format   = VK_FORMAT_R32G32B32A32_SFLOAT;
+            attribute.offset   = offsetof(Mesh_Vertex, color);
+            vertex_attributes.push_back(attribute);
+
+            attribute.location = 2;
+            attribute.format   = VK_FORMAT_R32G32_SFLOAT;
+            attribute.offset   = offsetof(Mesh_Vertex, uv);
+            vertex_attributes.push_back(attribute);
+
+            attribute.location = 3;
+            attribute.format   = VK_FORMAT_R32G32B32_SFLOAT;
+            attribute.offset   = offsetof(Mesh_Vertex, normal);
+            vertex_attributes.push_back(attribute);
+            
+            attribute.location = 4;
+            attribute.format   = VK_FORMAT_R32G32B32_SFLOAT;
+            attribute.offset   = offsetof(Mesh_Vertex, tangent);
+            vertex_attributes.push_back(attribute);
+            
+            attribute.location = 5;
+            attribute.format   = VK_FORMAT_R32G32B32_SFLOAT;
+            attribute.offset   = offsetof(Mesh_Vertex, bitangent);
+            vertex_attributes.push_back(attribute);
+
+            for (int i = 0; i < 4; i++) {
+                attribute.location = 6 + i;
+                attribute.binding  = 1;
+                attribute.format   = VK_FORMAT_R32G32B32A32_SFLOAT;
+                attribute.offset   = offsetof(Per_Object_Uniforms, world_matrix) + (sizeof(glm::vec4) * i);
+                vertex_attributes.push_back(attribute);
+            }
+
+            attribute.location = 10;
+            attribute.binding  = 1;
+            attribute.format   = VK_FORMAT_R32G32B32A32_SFLOAT;
+            attribute.offset   = offsetof(Per_Object_Uniforms, scale_color);
+            vertex_attributes.push_back(attribute);
+
+            attribute.location = 11;
+            attribute.binding  = 1;
+            attribute.format   = VK_FORMAT_R32G32B32A32_SINT;
+            attribute.offset   = offsetof(Per_Object_Uniforms, shadow_cascade_index);
+            vertex_attributes.push_back(attribute);
+        } break;
     }
     
-    vertex_binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+    vertex_bindings[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+    vertex_bindings[1].inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
     
     VkPipelineVertexInputStateCreateInfo vertex_input_info = {};
     vertex_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertex_input_info.vertexBindingDescriptionCount = 1;
-    vertex_input_info.pVertexBindingDescriptions = &vertex_binding;
+    vertex_input_info.vertexBindingDescriptionCount = num_vertex_bindings;
+    vertex_input_info.pVertexBindingDescriptions = vertex_bindings;
     vertex_input_info.vertexAttributeDescriptionCount = (u32)vertex_attributes.size();
     vertex_input_info.pVertexAttributeDescriptions = vertex_attributes.data();
 

@@ -33,8 +33,11 @@ struct Terrain_Chunk {
     Mesh mesh;
 
     eastl::vector <Terrain_Object_Instance_Data> objects;
+    eastl::vector <Per_Object_Uniforms> objects_instance_data;
+    Gpu_Buffer instance_buffers[Render_Backend::MAX_FRAMES_IN_FLIGHT * Scene_Renderer::MAX_RENDER_PASSES];
 
     struct Terrain_Object_Instance_Batch {
+        Mesh *mesh;
         Terrain_Object_Type type;
         int variation;
         int start_index;
@@ -43,6 +46,6 @@ struct Terrain_Chunk {
 
     eastl::vector <Terrain_Object_Instance_Batch> batches;
     
-    void generate(int num_vertices_per_side, float scale, glm::vec3 offset, int num_objects_to_place);
+    bool generate(int num_vertices_per_side, float scale, glm::vec3 offset, int num_objects_to_place);
     float get_height(float x, float z);
 };

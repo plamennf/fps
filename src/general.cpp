@@ -314,7 +314,7 @@ void logprintf(char *fmt, ...) {
     vsnprintf(buf, sizeof(buf), fmt, args);
     va_end(args);
 
-#if defined(BUILD_DEBUG) || defined(__EMSCRIPTEN__)
+#if defined(BUILD_DEBUG) || defined(BUILD_RELEASE)
     fprintf(stdout, "%s", buf);
     fflush(stdout);
 #endif

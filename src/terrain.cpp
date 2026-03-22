@@ -128,7 +128,7 @@ float Terrain_Chunk::get_height(float x, float z) {
     return glm::sin(x * frequency) * glm::cos(z * frequency) * amplitude;
 }
 
-void Terrain_Chunk::generate(int _num_vertices_per_side, float _scale, glm::vec3 _offset, int num_objects_to_place) {
+bool Terrain_Chunk::generate(int _num_vertices_per_side, float _scale, glm::vec3 _offset, int num_objects_to_place) {
     num_vertices_per_side = _num_vertices_per_side;
     scale                 = _scale;
     offset                = _offset;
@@ -316,7 +316,7 @@ void Terrain_Chunk::generate(int _num_vertices_per_side, float _scale, glm::vec3
     });
 
     batches.clear();
-    if (objects.empty()) return;
+    if (objects.empty()) return false;
 
     int start_index = 0;
     for (int i = 1; i <= objects.size(); i++) {
@@ -325,6 +325,7 @@ void Terrain_Chunk::generate(int _num_vertices_per_side, float _scale, glm::vec3
             objects[i].variation != objects[start_index].variation) {
             Terrain_Object_Instance_Batch batch;
 
+            batch.mesh        = objects[start_index].mesh;
             batch.type        = objects[start_index].type;
             batch.variation   = objects[start_index].variation;
             batch.start_index = start_index;
@@ -335,4 +336,27 @@ void Terrain_Chunk::generate(int _num_vertices_per_side, float _scale, glm::vec3
             start_index = i;
         }
     }
+
+    objects_instance_data.resize(objects.size());
+    for (int i = 0; i < Render_Backend::MAX_FRAMES_IN_FLIGHT * Scene_Renderer::MAX_RENDER_PASSES; i++) {
+        if (!globals.render_backend->create_buffer(&instance_buffers[i], VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, objects.size() * sizeof(Per_Object_Uniforms), NULL)) {
+            return false;
+        }
+    }
+    
+    for (auto &batch : batches) {
+        for (int i = batch.start_index; i < batch.start_index + batch.count; i++) {
+            auto &object = objects[i];
+
+            glm::mat4 world_matrix = glm::mat4(1.0f);
+            world_matrix = glm::translate(world_matrix, object.position);
+            world_matrix = glm::rotate(world_matrix, object.rotation, glm::vec3(0, 1, 0));
+            world_matrix = glm::scale(world_matrix, glm::vec3(object.scale));
+
+            objects_instance_data[i].world_matrix         = world_matrix;
+            objects_instance_data[i].scale_color          = glm::vec4(1);
+        }
+    }
+    
+    return true;
 }

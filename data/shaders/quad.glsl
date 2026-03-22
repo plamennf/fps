@@ -1,4 +1,5 @@
 #version 450
+#extension GL_ARB_shading_language_include : require
 
 layout(location = 0) COMM vec2 frag_uv;
 layout(location = 1) COMM vec4 frag_color;

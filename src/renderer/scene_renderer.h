@@ -9,59 +9,6 @@ struct Terrain_Chunk;
 
 struct Renderer_2D;
 
-const int MAX_LIGHTS = 8;
-
-const int MAX_SHADOW_CASCADES = 4;
-const int SHADOW_MAP_WIDTH    = 4096;
-const int SHADOW_MAP_HEIGHT   = SHADOW_MAP_WIDTH;
-
-enum Light_Type : int {
-    LIGHT_TYPE_UNKNOWN,
-    LIGHT_TYPE_DIRECTIONAL,
-    LIGHT_TYPE_POINT,
-    LIGHT_TYPE_SPOT,
-};
-
-struct Light {
-    Light_Type type;
-    int _padding0[3];
-    glm::vec3 position;
-    float _padding1;
-    glm::vec3 direction;
-    float _padding2;
-    glm::vec3 color;
-    float intensity;
-    float range;
-    float spot_inner_cone_angle;
-    float spot_outer_cone_angle;
-    float _padding3;
-};
-static_assert(sizeof(Light) % 16 == 0, "Light struct must be 16-byte aligned");
-
-struct Per_Scene_Uniforms {
-    glm::mat4 projection_matrix;
-    glm::mat4 view_matrix;
-    glm::mat4 light_matrix[MAX_SHADOW_CASCADES];
-    glm::vec4 cascade_splits[MAX_SHADOW_CASCADES];  // We are wasting memory right now because of hlsl alignment rules. If we end up with a MAX_SHADOW_CASCADES value which is a multiple of 4 we can fix this.
-    Light lights[MAX_LIGHTS];
-    glm::vec3 camera_position;
-    float _padding0;
-};
-
-struct Per_Object_Uniforms {
-    glm::mat4 world_matrix;
-    glm::vec4 scale_color;
-    int shadow_cascade_index;
-};
-static_assert(sizeof(Per_Object_Uniforms) % 84 == 0, "Per_Object_Uniforms has mismatched size");
-
-struct Material_Uniforms {
-    glm::vec4 albedo_factor;
-    glm::vec3 emissive_factor;
-    int uses_specular_glossiness;
-    int has_normal_map;
-};
-
 struct Render_Entity {
     glm::mat4 world_matrix;
     Mesh *mesh;
@@ -69,6 +16,8 @@ struct Render_Entity {
 };
 
 struct Scene_Renderer {
+    static const int MAX_RENDER_PASSES = MAX_SHADOW_CASCADES + 1;
+    
     static const int MAX_RENDER_ENTITIES = 1024;
     
     bool init(Render_Backend *backend, Renderer_2D *renderer_2d);
@@ -97,6 +46,7 @@ private:
     void draw_hud(VkExtent2D extent);
 
     void draw_mesh(VkCommandBuffer cb, Mesh *mesh, glm::mat4 const &world_matrix, glm::vec4 scale_color, int cascade_index = -1);
+    void draw_mesh_instanced(VkCommandBuffer cb, Mesh *mesh, Gpu_Buffer *instance_buffer, int offset, int count);
     
 private:
     Render_Backend *backend = NULL;
@@ -123,8 +73,21 @@ private:
     VkDescriptorSetLayout material_uniforms_descriptor_set_layout;
 
     VkPipelineLayout mesh_pipeline_layout;
+    VkPipelineLayout mesh_instanced_pipeline_layout;
     VkPipeline mesh_pipeline;
+    VkPipeline mesh_instanced_pipeline;
     VkPipeline shadow_pipeline;
+    VkPipeline shadow_instanced_pipeline;
 
     VkPipeline resolve_pipeline;
+
+    // Per-frame data:
+    enum Render_Stage {
+        RENDER_STAGE_SHADOWS,
+        RENDER_STAGE_MAIN,
+    };
+
+    Render_Stage current_render_stage;
+    VkPipelineLayout pipeline_layout_for_current_pass;
+    VkPipeline pipeline_for_current_pass;
 };

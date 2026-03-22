@@ -101,36 +101,65 @@ bool Scene_Renderer::init(Render_Backend *_backend, Renderer_2D *_renderer_2d) {
         per_scene_uniforms_descriptor_set_layout,
         material_uniforms_descriptor_set_layout,
     };
-    if (!backend->create_graphics_pipeline_layout(ArrayCount(mesh_descriptor_set_layouts), mesh_descriptor_set_layouts, 1, &per_object_push_constant_range, &mesh_pipeline_layout)) {
-        return false;
-    }
     
-    Graphics_Pipeline_Info mesh_pipepline_info = {};
-    mesh_pipepline_info.pipeline_layout = mesh_pipeline_layout;
-    mesh_pipepline_info.shader_filename = "basic";
-    mesh_pipepline_info.vertex_type     = RENDER_VERTEX_MESH;
-    mesh_pipepline_info.blend_mode      = BLEND_MODE_OFF;
-    mesh_pipepline_info.cull_mode       = CULL_MODE_BACK;
-    mesh_pipepline_info.depth_test_mode = DEPTH_TEST_MODE_LEQUAL;
-    mesh_pipepline_info.depth_write     = true;
-    mesh_pipepline_info.color_write     = true;
-    mesh_pipepline_info.color_attachment_format = VK_FORMAT_R16G16B16A16_SFLOAT;//offscreen_buffer.format;
-    mesh_pipepline_info.depth_attachment_format = VK_FORMAT_D32_SFLOAT;//depth_buffer.format;
-    if (!backend->create_graphics_pipeline(mesh_pipepline_info, &mesh_pipeline)) {
+    if (!backend->create_graphics_pipeline_layout(ArrayCount(mesh_descriptor_set_layouts), mesh_descriptor_set_layouts, 1, &per_object_push_constant_range, &mesh_pipeline_layout)) return false;
+    if (!backend->create_graphics_pipeline_layout(ArrayCount(mesh_descriptor_set_layouts), mesh_descriptor_set_layouts, 0, NULL, &mesh_instanced_pipeline_layout)) return false;
+    
+    Graphics_Pipeline_Info mesh_pipeline_info = {};
+    mesh_pipeline_info.pipeline_layout = mesh_pipeline_layout;
+    mesh_pipeline_info.shader_filename = "basic";
+    mesh_pipeline_info.vertex_type     = RENDER_VERTEX_MESH;
+    mesh_pipeline_info.blend_mode      = BLEND_MODE_OFF;
+    mesh_pipeline_info.cull_mode       = CULL_MODE_BACK;
+    mesh_pipeline_info.depth_test_mode = DEPTH_TEST_MODE_LEQUAL;
+    mesh_pipeline_info.depth_write     = true;
+    mesh_pipeline_info.color_write     = true;
+    mesh_pipeline_info.color_attachment_format = VK_FORMAT_R16G16B16A16_SFLOAT;//offscreen_buffer.format;
+    mesh_pipeline_info.depth_attachment_format = VK_FORMAT_D32_SFLOAT;//depth_buffer.format;
+    if (!backend->create_graphics_pipeline(mesh_pipeline_info, &mesh_pipeline)) {
         return false;
     }
 
-    Graphics_Pipeline_Info shadow_pipepline_info = {};
-    shadow_pipepline_info.pipeline_layout = mesh_pipeline_layout;
-    shadow_pipepline_info.shader_filename = "shadow";
-    shadow_pipepline_info.vertex_type     = RENDER_VERTEX_MESH;
-    shadow_pipepline_info.blend_mode      = BLEND_MODE_OFF;
-    shadow_pipepline_info.cull_mode       = CULL_MODE_NONE;
-    shadow_pipepline_info.depth_test_mode = DEPTH_TEST_MODE_LEQUAL;
-    shadow_pipepline_info.depth_write     = true;
-    shadow_pipepline_info.color_write     = false;
-    shadow_pipepline_info.depth_attachment_format = VK_FORMAT_D32_SFLOAT;//shadow_map_buffers[0].format;
-    if (!backend->create_graphics_pipeline(shadow_pipepline_info, &shadow_pipeline)) {
+    Graphics_Pipeline_Info mesh_instanced_pipeline_info = {};
+    mesh_instanced_pipeline_info.pipeline_layout = mesh_instanced_pipeline_layout;
+    mesh_instanced_pipeline_info.shader_filename = "basic_instanced";
+    mesh_instanced_pipeline_info.vertex_type     = RENDER_VERTEX_MESH_INSTANCED;
+    mesh_instanced_pipeline_info.blend_mode      = BLEND_MODE_OFF;
+    mesh_instanced_pipeline_info.cull_mode       = CULL_MODE_BACK;
+    mesh_instanced_pipeline_info.depth_test_mode = DEPTH_TEST_MODE_LEQUAL;
+    mesh_instanced_pipeline_info.depth_write     = true;
+    mesh_instanced_pipeline_info.color_write     = true;
+    mesh_instanced_pipeline_info.color_attachment_format = VK_FORMAT_R16G16B16A16_SFLOAT;//offscreen_buffer.format;
+    mesh_instanced_pipeline_info.depth_attachment_format = VK_FORMAT_D32_SFLOAT;//depth_buffer.format;
+    if (!backend->create_graphics_pipeline(mesh_instanced_pipeline_info, &mesh_instanced_pipeline)) {
+        return false;
+    }
+    
+    Graphics_Pipeline_Info shadow_pipeline_info = {};
+    shadow_pipeline_info.pipeline_layout = mesh_pipeline_layout;
+    shadow_pipeline_info.shader_filename = "shadow";
+    shadow_pipeline_info.vertex_type     = RENDER_VERTEX_MESH;
+    shadow_pipeline_info.blend_mode      = BLEND_MODE_OFF;
+    shadow_pipeline_info.cull_mode       = CULL_MODE_NONE;
+    shadow_pipeline_info.depth_test_mode = DEPTH_TEST_MODE_LEQUAL;
+    shadow_pipeline_info.depth_write     = true;
+    shadow_pipeline_info.color_write     = false;
+    shadow_pipeline_info.depth_attachment_format = VK_FORMAT_D32_SFLOAT;//shadow_map_buffers[0].format;
+    if (!backend->create_graphics_pipeline(shadow_pipeline_info, &shadow_pipeline)) {
+        return false;
+    }
+
+    Graphics_Pipeline_Info shadow_instanced_pipeline_info = {};
+    shadow_instanced_pipeline_info.pipeline_layout = mesh_instanced_pipeline_layout;
+    shadow_instanced_pipeline_info.shader_filename = "shadow_instanced";
+    shadow_instanced_pipeline_info.vertex_type     = RENDER_VERTEX_MESH_INSTANCED;
+    shadow_instanced_pipeline_info.blend_mode      = BLEND_MODE_OFF;
+    shadow_instanced_pipeline_info.cull_mode       = CULL_MODE_NONE;
+    shadow_instanced_pipeline_info.depth_test_mode = DEPTH_TEST_MODE_LEQUAL;
+    shadow_instanced_pipeline_info.depth_write     = true;
+    shadow_instanced_pipeline_info.color_write     = false;
+    shadow_instanced_pipeline_info.depth_attachment_format = VK_FORMAT_D32_SFLOAT;//shadow_map_buffers[0].format;
+    if (!backend->create_graphics_pipeline(shadow_instanced_pipeline_info, &shadow_instanced_pipeline)) {
         return false;
     }
 
@@ -228,9 +257,8 @@ void Scene_Renderer::render() {
     backend->update_buffer(&per_scene_uniform_buffers[backend->current_frame], 0, sizeof(per_scene_uniforms), &per_scene_uniforms);
     //backend->update_descriptor_set(per_scene_uniforms_descriptor_sets[backend->current_frame], 0, &per_scene_uniform_buffers[backend->current_frame]);
 
-    vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, shadow_pipeline);
-    vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh_pipeline_layout, 0, 1, &per_scene_uniforms_descriptor_sets[backend->current_frame], 0, NULL);
-
+    current_render_stage = RENDER_STAGE_SHADOWS;
+    
     for (int i = 0; i < MAX_SHADOW_CASCADES; i++) {
         backend->image_layout_transition(cb, shadow_map_buffers[i].image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, { VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1 });
         
@@ -245,9 +273,9 @@ void Scene_Renderer::render() {
     
     // Draw main pass
     backend->image_layout_transition(cb, depth_buffer.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, { VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1 });
-    vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh_pipeline_layout, 0, 1, &per_scene_uniforms_descriptor_sets[backend->current_frame], 0, NULL);
+    //vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh_pipeline_layout, 0, 1, &per_scene_uniforms_descriptor_sets[backend->current_frame], 0, NULL);
     begin_rendering(cb, &offscreen_buffer, &depth_buffer, extent, glm::vec4(0.2f, 0.5f, 0.8f, 1.0f), 1.0f, 0);
-    vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh_pipeline);
+    current_render_stage = RENDER_STAGE_MAIN;
     render_all_entities(cb);
     end_rendering(cb);
 
@@ -370,26 +398,97 @@ void Scene_Renderer::generate_gpu_data_for_submesh(Submesh *submesh) {
 }
 
 void Scene_Renderer::render_all_entities(VkCommandBuffer cb, int cascade_index) {
+    //
+    // Draw instanced objects
+    //
+    
     for (int i = 0; i < terrain_chunks.size(); i++) {
-        auto const &chunk = terrain_chunks[i];
+        MyZoneScopedN("Render one terrain chunk");
+        
+        auto &chunk = terrain_chunks[i];
 
-        glm::vec3 world_position = chunk.offset;
-        glm::mat4 world_matrix = glm::translate(glm::mat4(1.0f), world_position);
-        draw_mesh(cb, (Mesh *)&chunk.mesh, world_matrix, glm::vec4(0, 1, 0, 1), cascade_index);
+        {
+            MyZoneScopedN("Render terrain mesh");
+            
+            switch (current_render_stage) {
+                case RENDER_STAGE_SHADOWS: {
+                    pipeline_for_current_pass = shadow_pipeline;
+                } break;
 
-        for (auto const &batch : chunk.batches) {
+                case RENDER_STAGE_MAIN: {
+                    pipeline_for_current_pass = mesh_pipeline;
+                } break;
+            }
+
+            pipeline_layout_for_current_pass = mesh_pipeline_layout;
+
+            vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_for_current_pass);
+            vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_for_current_pass, 0, 1, &per_scene_uniforms_descriptor_sets[backend->current_frame], 0, NULL);
+        
+            glm::vec3 world_position = chunk.offset;
+            glm::mat4 world_matrix = glm::translate(glm::mat4(1.0f), world_position);
+            draw_mesh(cb, (Mesh *)&chunk.mesh, world_matrix, glm::vec4(0, 1, 0, 1), cascade_index);
+        }
+
+        int instance_buffer_index = MAX_RENDER_ENTITIES * backend->current_frame;
+        switch (current_render_stage) {
+            case RENDER_STAGE_SHADOWS: {
+                pipeline_for_current_pass = shadow_instanced_pipeline;
+                instance_buffer_index = cascade_index;
+            } break;
+
+            case RENDER_STAGE_MAIN: {
+                pipeline_for_current_pass = mesh_instanced_pipeline;
+                instance_buffer_index = MAX_SHADOW_CASCADES;
+            } break;
+        }
+    
+        pipeline_layout_for_current_pass = mesh_instanced_pipeline_layout;
+
+        vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_for_current_pass);
+        vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_for_current_pass, 0, 1, &per_scene_uniforms_descriptor_sets[backend->current_frame], 0, NULL);
+        
+        for (auto &batch : chunk.batches) {
+            MyZoneScopedN("Update data for terrain chunk batches");
+            
             for (int i = batch.start_index; i < batch.start_index + batch.count; i++) {
-                auto const &object = chunk.objects[i];
+                auto &object = chunk.objects[i];
 
-                glm::mat4 world_matrix = glm::mat4(1.0f);
-                world_matrix = glm::translate(world_matrix, object.position);
-                world_matrix = glm::rotate(world_matrix, object.rotation, glm::vec3(0, 1, 0));
-                world_matrix = glm::scale(world_matrix, glm::vec3(object.scale));
-
-                draw_mesh(cb, object.mesh, world_matrix, glm::vec4(1, 1, 1, 1), cascade_index);
+                chunk.objects_instance_data[i].shadow_cascade_index = cascade_index;
             }
         }
+
+        Gpu_Buffer *instance_buffer = &chunk.instance_buffers[instance_buffer_index];
+        
+        {
+            MyZoneScopedN("Update instance buffer");
+            backend->update_buffer(instance_buffer, 0, chunk.objects_instance_data.size() * sizeof(Per_Object_Uniforms), chunk.objects_instance_data.data());
+        }
+            
+        for (auto const &batch : chunk.batches) {
+            MyZoneScopedN("Render one terrain chunk batch");
+            draw_mesh_instanced(cb, batch.mesh, instance_buffer, batch.start_index, batch.count);
+        }
     }
+
+    //
+    // Draw non-instanced objects
+    //
+    
+    switch (current_render_stage) {
+        case RENDER_STAGE_SHADOWS: {
+            pipeline_for_current_pass = shadow_pipeline;
+        } break;
+
+        case RENDER_STAGE_MAIN: {
+            pipeline_for_current_pass = mesh_pipeline;
+        } break;
+    }
+
+    pipeline_layout_for_current_pass = mesh_pipeline_layout;
+
+    vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_for_current_pass);
+    vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_for_current_pass, 0, 1, &per_scene_uniforms_descriptor_sets[backend->current_frame], 0, NULL);
     
     for (int i = 0; i < render_entities.size(); i++) {
         MyZoneScopedN("Draw single mesh");
@@ -633,8 +732,9 @@ void Scene_Renderer::draw_mesh(VkCommandBuffer cb, Mesh *mesh, glm::mat4 const &
     per_object_uniforms.world_matrix         = world_matrix;
     per_object_uniforms.scale_color          = scale_color;
     per_object_uniforms.shadow_cascade_index = cascade_index;
-        
-    vkCmdPushConstants(cb, mesh_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(Per_Object_Uniforms), &per_object_uniforms);
+
+    Assert(pipeline_layout_for_current_pass == mesh_pipeline_layout);
+    vkCmdPushConstants(cb, pipeline_layout_for_current_pass, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(Per_Object_Uniforms), &per_object_uniforms);
 
     for (int i = 0; i < mesh->num_submeshes; i++) {
         Submesh *submesh = &mesh->submeshes[i];
@@ -645,12 +745,35 @@ void Scene_Renderer::draw_mesh(VkCommandBuffer cb, Mesh *mesh, glm::mat4 const &
 
         MyZoneScopedN("Draw one submesh");
         
-        vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh_pipeline_layout, 1, 1, &submesh->material.descriptor_set, 0, NULL);
+        vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_for_current_pass, 1, 1, &submesh->material.descriptor_set, 0, NULL);
 
         VkDeviceSize offset = 0;
         vkCmdBindVertexBuffers(cb, 0, 1, &submesh->vertex_buffer.buffer, &offset);
         vkCmdBindIndexBuffer(cb, submesh->index_buffer.buffer, 0, VK_INDEX_TYPE_UINT32);
 
         vkCmdDrawIndexed(cb, submesh->num_indices, 1, 0, 0, 0);
+    }
+}
+
+void Scene_Renderer::draw_mesh_instanced(VkCommandBuffer cb, Mesh *mesh, Gpu_Buffer *instance_buffer, int offset, int count) {
+    for (int i = 0; i < mesh->num_submeshes; i++) {
+        Submesh *submesh = &mesh->submeshes[i];
+        if (!submesh->has_gpu_data) {
+            generate_gpu_data_for_submesh(submesh);
+            if (!submesh->has_gpu_data) continue;
+        }
+
+        MyZoneScopedN("Draw one submesh instanced");
+
+        Assert(pipeline_layout_for_current_pass == mesh_instanced_pipeline_layout);
+        vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_for_current_pass, 1, 1, &submesh->material.descriptor_set, 0, NULL);
+
+        VkBuffer vertex_buffers[] = { submesh->vertex_buffer.buffer, instance_buffer->buffer };
+        //VkDeviceSize offsets[] = { 0, (VkDeviceSize)offset };
+        VkDeviceSize offsets[] = { 0, 0 };
+        vkCmdBindVertexBuffers(cb, 0, 2, vertex_buffers, offsets);
+        vkCmdBindIndexBuffer(cb, submesh->index_buffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+
+        vkCmdDrawIndexed(cb, submesh->num_indices, count, 0, 0, offset);
     }
 }

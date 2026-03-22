@@ -201,6 +201,7 @@ int main(int argc, char *argv[]) {
     }
 
     Terrain_Chunk chunk;
+    //chunk.generate(128, 1.0f, glm::vec3(0.0f), 100000);
     chunk.generate(128, 1.0f, glm::vec3(0.0f), 10000);
     
     float accumulated_dt = 0.0f;

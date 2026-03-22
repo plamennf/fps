@@ -2,6 +2,7 @@
 #extension GL_ARB_shading_language_include : require
 
 #define DO_3D_LIGHTING
+#define USE_INSTANCING
 #include "shader_globals.glsl"
 
 layout(location = 0) COMM vec2 frag_uv;
@@ -14,16 +15,16 @@ layout(location = 6) COMM vec3 world_position;
 
 void main() {
     frag_uv = vec2(in_uv.x, 1.0 - in_uv.y);
-    frag_color = in_color * per_object.scale_color;
+    frag_color = in_color * instance_scale_color;
     
-    gl_Position = per_scene.projection * per_scene.view * per_object.world * vec4(in_position, 1.0);
+    gl_Position = per_scene.projection * per_scene.view * instance_world_matrix * vec4(in_position, 1.0);
 
-    world_position = (per_object.world * vec4(in_position, 1.0)).xyz;
+    world_position = (instance_world_matrix * vec4(in_position, 1.0)).xyz;
 
-    mat3 normal_matrix = transpose(inverse(mat3(per_object.world)));
+    mat3 normal_matrix = transpose(inverse(mat3(instance_world_matrix)));
     world_normal       = normal_matrix * in_normal;
 
-    vec3 T = normalize((per_object.world * vec4(in_tangent, 0.0)).xyz);
+    vec3 T = normalize((instance_world_matrix * vec4(in_tangent, 0.0)).xyz);
     vec3 N = normalize(world_normal);
     T = normalize(T - dot(T, N) * N);
     vec3 B = cross(N, T);
