@@ -5,6 +5,7 @@
 
 struct Mesh;
 struct Submesh;
+struct Terrain_Chunk;
 
 struct Renderer_2D;
 
@@ -80,6 +81,7 @@ struct Scene_Renderer {
     void set_camera(Camera camera);
     void add_light(Light light);
     void add_render_entity(Mesh *mesh, glm::vec3 position, glm::vec3 rotation, glm::vec3 scale, glm::vec4 scale_color);
+    void add_terrain_chunk(Terrain_Chunk *chunk);
 
 private:
     void generate_gpu_data_for_submesh(Submesh *submesh);
@@ -93,6 +95,8 @@ private:
 
     void draw_imgui_stuff();
     void draw_hud(VkExtent2D extent);
+
+    void draw_mesh(VkCommandBuffer cb, Mesh *mesh, glm::mat4 const &world_matrix, glm::vec4 scale_color, int cascade_index = -1);
     
 private:
     Render_Backend *backend = NULL;
@@ -101,10 +105,11 @@ private:
     Texture offscreen_buffer;
     Texture depth_buffer;
     Texture shadow_map_buffers[MAX_SHADOW_CASCADES];
-
+    
     float shadow_cascade_splits[MAX_SHADOW_CASCADES] = { 10.0f, 25.0f, 60.0f, 100.0f };
     
     eastl::vector <Render_Entity> render_entities;
+    eastl::vector <Terrain_Chunk> terrain_chunks;
     Light lights[MAX_LIGHTS] = {};
     int num_lights = 0;
     Camera camera;

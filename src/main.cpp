@@ -201,7 +201,7 @@ int main(int argc, char *argv[]) {
     }
 
     Terrain_Chunk chunk;
-    chunk.generate(128, 1.0f, glm::vec3(0.0f));
+    chunk.generate(128, 1.0f, glm::vec3(0.0f), 10000);
     
     float accumulated_dt = 0.0f;
     float fixed_update_dt = 1.0f / 60.0f;
@@ -401,7 +401,7 @@ int main(int argc, char *argv[]) {
             globals.scene_renderer->add_light(l5);
             globals.scene_renderer->add_light(spot_light);
 
-            globals.scene_renderer->add_render_entity(&chunk.mesh, {0, 0, 0}, {0, 0, 0}, {1, 1, 1}, {0, 1, 0, 1});
+            globals.scene_renderer->add_terrain_chunk(&chunk);
             
             //globals.scene_renderer->add_render_entity(cube, {-50, -1, -50}, {0, 0, 0}, {100, 1, 100}, {1, 1, 1, 1});
 

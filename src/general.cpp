@@ -400,6 +400,9 @@ float random_float() {
     return (float)rand() / (float)RAND_MAX;
 }
 
+float random_float(float min, float max) {
+    return min + (random_float() * max);
+}
 
 #ifdef _WIN32
 

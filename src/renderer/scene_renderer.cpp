@@ -5,6 +5,7 @@
 #include "../main.h"
 #include "texture_registry.h"
 #include "mesh_registry.h"
+#include "../terrain.h"
 
 bool Scene_Renderer::init(Render_Backend *_backend, Renderer_2D *_renderer_2d) {
     backend = _backend;
@@ -276,6 +277,7 @@ void Scene_Renderer::render() {
     backend->image_layout_transition(cb, backend->get_current_swap_chain_image(), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, color_range);
 
     render_entities.clear();
+    terrain_chunks.clear();
     num_lights = 0;
 }
 
@@ -309,6 +311,10 @@ void Scene_Renderer::add_render_entity(Mesh *mesh, glm::vec3 position, glm::vec3
     entity.scale_color  = scale_color;
     
     render_entities.push_back(entity);
+}
+
+void Scene_Renderer::add_terrain_chunk(Terrain_Chunk *chunk) {
+    terrain_chunks.push_back(*chunk);
 }
 
 void Scene_Renderer::generate_gpu_data_for_submesh(Submesh *submesh) {
@@ -364,37 +370,32 @@ void Scene_Renderer::generate_gpu_data_for_submesh(Submesh *submesh) {
 }
 
 void Scene_Renderer::render_all_entities(VkCommandBuffer cb, int cascade_index) {
+    for (int i = 0; i < terrain_chunks.size(); i++) {
+        auto const &chunk = terrain_chunks[i];
+
+        glm::vec3 world_position = chunk.offset;
+        glm::mat4 world_matrix = glm::translate(glm::mat4(1.0f), world_position);
+        draw_mesh(cb, (Mesh *)&chunk.mesh, world_matrix, glm::vec4(0, 1, 0, 1), cascade_index);
+
+        for (auto const &batch : chunk.batches) {
+            for (int i = batch.start_index; i < batch.start_index + batch.count; i++) {
+                auto const &object = chunk.objects[i];
+
+                glm::mat4 world_matrix = glm::mat4(1.0f);
+                world_matrix = glm::translate(world_matrix, object.position);
+                world_matrix = glm::rotate(world_matrix, object.rotation, glm::vec3(0, 1, 0));
+                world_matrix = glm::scale(world_matrix, glm::vec3(object.scale));
+
+                draw_mesh(cb, object.mesh, world_matrix, glm::vec4(1, 1, 1, 1), cascade_index);
+            }
+        }
+    }
+    
     for (int i = 0; i < render_entities.size(); i++) {
         MyZoneScopedN("Draw single mesh");
         
         auto const &entity = render_entities[i];
-
-        Per_Object_Uniforms per_object_uniforms = {};
-
-        per_object_uniforms.world_matrix         = entity.world_matrix;
-        per_object_uniforms.scale_color          = entity.scale_color;
-        per_object_uniforms.shadow_cascade_index = cascade_index;
-        
-        vkCmdPushConstants(cb, mesh_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(Per_Object_Uniforms), &per_object_uniforms);
-        
-        Mesh *mesh = entity.mesh;
-        for (int i = 0; i < mesh->num_submeshes; i++) {
-            Submesh *submesh = &mesh->submeshes[i];
-            if (!submesh->has_gpu_data) {
-                generate_gpu_data_for_submesh(submesh);
-                if (!submesh->has_gpu_data) continue;
-            }
-
-            MyZoneScopedN("Draw one submesh");
-            
-            vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh_pipeline_layout, 1, 1, &submesh->material.descriptor_set, 0, NULL);
-
-            VkDeviceSize offset = 0;
-            vkCmdBindVertexBuffers(cb, 0, 1, &submesh->vertex_buffer.buffer, &offset);
-            vkCmdBindIndexBuffer(cb, submesh->index_buffer.buffer, 0, VK_INDEX_TYPE_UINT32);
-
-            vkCmdDrawIndexed(cb, submesh->num_indices, 1, 0, 0, 0);
-        }
+        draw_mesh(cb, entity.mesh, entity.world_matrix, entity.scale_color, cascade_index);
     }
 }
 
@@ -624,4 +625,32 @@ void Scene_Renderer::draw_hud(VkExtent2D extent) {
     }
     
     renderer_2d->draw_text(font, text, x, y, color);
+}
+
+void Scene_Renderer::draw_mesh(VkCommandBuffer cb, Mesh *mesh, glm::mat4 const &world_matrix, glm::vec4 scale_color, int cascade_index) {
+    Per_Object_Uniforms per_object_uniforms = {};
+
+    per_object_uniforms.world_matrix         = world_matrix;
+    per_object_uniforms.scale_color          = scale_color;
+    per_object_uniforms.shadow_cascade_index = cascade_index;
+        
+    vkCmdPushConstants(cb, mesh_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(Per_Object_Uniforms), &per_object_uniforms);
+
+    for (int i = 0; i < mesh->num_submeshes; i++) {
+        Submesh *submesh = &mesh->submeshes[i];
+        if (!submesh->has_gpu_data) {
+            generate_gpu_data_for_submesh(submesh);
+            if (!submesh->has_gpu_data) continue;
+        }
+
+        MyZoneScopedN("Draw one submesh");
+        
+        vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh_pipeline_layout, 1, 1, &submesh->material.descriptor_set, 0, NULL);
+
+        VkDeviceSize offset = 0;
+        vkCmdBindVertexBuffers(cb, 0, 1, &submesh->vertex_buffer.buffer, &offset);
+        vkCmdBindIndexBuffer(cb, submesh->index_buffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+
+        vkCmdDrawIndexed(cb, submesh->num_indices, 1, 0, 0, 0);
+    }
 }
