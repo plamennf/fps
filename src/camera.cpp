@@ -78,7 +78,16 @@ void fixed_update_camera_fps(Camera *camera, float dt, Terrain_Chunk *chunk) {
 
     camera->position.y += camera->jump_velocity;// * dt;
 
-    float terrain_height = chunk->get_height(camera->position.x, camera->position.z);
+    float x = camera->position.x;
+    float z = camera->position.z;
+    float r = 0.3f;
+
+    float h1 = chunk->get_height(x + r, z);
+    float h2 = chunk->get_height(x - r, z);
+    float h3 = chunk->get_height(x, z + r);
+    float h4 = chunk->get_height(x, z - r);
+
+    float terrain_height = Max(Max(h1, h2), Max(h3, h4));
     float desired_height = terrain_height + camera->head_y;
     
     if (camera->position.y < desired_height) {
