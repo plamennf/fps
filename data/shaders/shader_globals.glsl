@@ -222,7 +222,7 @@ vec3 fresnel_schlick(float cos_theta, vec3 F0) {
     return F0 + (1.0 - F0) * pow(clamp(1.0 - cos_theta, 0.0, 1.0), 5.0);
 }
 
-vec3 calculate_lighting(vec2 frag_uv, vec4 frag_color, vec3 world_normal, mat3 TBN, vec3 world_position) {
+vec3 calculate_lighting(vec2 frag_uv, vec4 frag_color, vec3 world_normal, mat3 TBN, vec3 world_position, vec3 view_position) {
     vec4 full_albedo = texture(albedo_texture, frag_uv);
     vec3 albedo      = full_albedo.rgb * material.albedo_factor.xyz * frag_color.rgb;
     
@@ -332,6 +332,15 @@ vec3 calculate_lighting(vec2 frag_uv, vec4 frag_color, vec3 world_normal, mat3 T
     vec3 ambient = vec3(0.03) * albedo * ao;
     vec3 color   = ambient + Lo + emissive;
 
+    const float density  = 0.007;
+    const float gradient = 1.5;
+    
+    float distance_to_camera = length(view_position);
+    float visibility = exp(-pow((distance_to_camera*density), gradient));
+    visibility = clamp(visibility, 0.0, 1.0);
+    vec3 sky_color = vec3(0.2, 0.5, 0.8);
+    color = mix(sky_color, color, visibility);
+    
     return color;
 }
 

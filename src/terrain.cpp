@@ -128,11 +128,13 @@ float Terrain_Chunk::get_height(float x, float z) {
     return glm::sin(x * frequency) * glm::cos(z * frequency) * amplitude;
 }
 
-bool Terrain_Chunk::generate(int _num_vertices_per_side, float _scale, glm::vec3 _offset, int num_objects_to_place) {
+bool Terrain_Chunk::generate(u32 seed, int _num_vertices_per_side, float _scale, glm::vec3 _offset, int num_objects_to_place) {
     num_vertices_per_side = _num_vertices_per_side;
     scale                 = _scale;
     offset                = _offset;
 
+    srand(seed);
+    
     eastl::vector <Mesh_Vertex> vertices;
     eastl::vector <u32> indices;
     
