@@ -15,7 +15,8 @@ void main() {
     world_position = (per_object.world * vec4(in_position, 1.0)).xyz;
     
     mat3 normal_matrix = transpose(inverse(mat3(per_object.world)));
-    world_normal       = (per_object.world * vec4(in_normal, 0.0)).xyz;
+    //world_normal       = (per_object.world * vec4(in_normal, 0.0)).xyz;
+    world_normal       = normal_matrix * in_normal;
 }
 
 #endif

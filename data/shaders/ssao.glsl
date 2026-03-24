@@ -7,7 +7,7 @@
 layout(location = 0) COMM vec2 frag_uv;
 layout(location = 1) COMM vec4 frag_color;
 
-#define SSAO_KERNEL_SIZE 64
+#define SSAO_KERNEL_SIZE 192
 
 layout(set = 1, binding = 0) uniform SSAO_Kernel {
     vec4 ssao_kernel[SSAO_KERNEL_SIZE];
@@ -39,7 +39,7 @@ layout(set = 1, binding = 4) uniform sampler2D noise_texture;
 void main() {
     vec3 frag_pos   = texture(position_texture, frag_uv).xyz;
     vec3 normal     = normalize(texture(normal_texture, frag_uv).xyz * 2.0 - 1.0);
-    vec3 random_vec = normalize(texture(noise_texture,  frag_uv * per_scene.ssao_noise_scale).xyz);
+    vec3 random_vec = normalize(texture(noise_texture,  frag_uv * per_scene.ssao_noise_scale).xyz) * 0.7;
     vec3 tangent    = normalize(random_vec - normal * dot(random_vec, normal));
     vec3 bitangent  = cross(normal, tangent);
     mat3 TBN        = mat3(tangent, bitangent, normal);
@@ -56,8 +56,15 @@ void main() {
 
         float sample_depth = texture(position_texture, offset.xy).z;
 
+#if 0
         float range_check  = smoothstep(0.0, 1.0, per_scene.ssao_radius / abs(frag_pos.z - sample_depth));
         occlusion         += (sample_depth >= sample_pos.z + per_scene.ssao_bias ? 1.0 : 0.0) * range_check;
+#else
+        float range_check  = smoothstep(0.0, 1.0, per_scene.ssao_radius / abs(frag_pos.z - sample_depth));
+        float diff = sample_depth - sample_pos.z;
+        float contrib = smoothstep(0.0, per_scene.ssao_radius, max(diff, 0.0));
+        occlusion += contrib * range_check;
+#endif
     }
 
     occlusion = 1.0 - (occlusion / SSAO_KERNEL_SIZE);

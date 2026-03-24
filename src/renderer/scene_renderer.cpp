@@ -7,6 +7,9 @@
 #include "mesh_registry.h"
 #include "../terrain.h"
 
+static const int NOISE_TEXTURE_WIDTH  = 16;
+static const int NOISE_TEXTURE_HEIGHT = 16;
+
 bool Scene_Renderer::init(Render_Backend *_backend, Renderer_2D *_renderer_2d) {
     backend = _backend;
     renderer_2d = _renderer_2d;
@@ -21,17 +24,41 @@ bool Scene_Renderer::init(Render_Backend *_backend, Renderer_2D *_renderer_2d) {
         return false;
     }
 
-    glm::vec4 noise_data[16];
-    for (int i = 0; i < 16; i++) {
+    glm::vec4 noise_data[NOISE_TEXTURE_WIDTH * NOISE_TEXTURE_HEIGHT];
+    for (int i = 0; i < NOISE_TEXTURE_WIDTH * NOISE_TEXTURE_HEIGHT; i++) {
         float x = random_float(-1.0f, 1.0f);
         float y = random_float(-1.0f, 1.0f);
+        float z = random_float(+0.0f, 1.0f);
 
-        glm::vec3 v = glm::normalize_or_zero(glm::vec3(x, y, 0.0f));
+        glm::vec3 v = glm::normalize_or_zero(glm::vec3(x, y, z));
 
         noise_data[i] = glm::vec4(v, 0.0f);
     }
 
-    if (!backend->create_texture(&ssao_noise_texture, 4, 4, VK_FORMAT_R16G16B16A16_SFLOAT, noise_data)) return false;
+    if (!backend->create_texture(&ssao_noise_texture, NOISE_TEXTURE_WIDTH, NOISE_TEXTURE_HEIGHT, VK_FORMAT_R16G16B16A16_SFLOAT, noise_data)) return false;
+
+    glm::vec4 ssao_kernel[SSAO_KERNEL_SIZE];
+
+    for (int i = 0; i < SSAO_KERNEL_SIZE; i++) {
+#if 1
+        glm::vec3 sample(
+            random_float(-1.0f, 1.0f),
+            random_float(-1.0f, 1.0f),
+            random_float(0.0f, 1.0f) );
+        sample = glm::normalize_or_zero(sample);
+        float scale = float(i) / float(SSAO_KERNEL_SIZE);
+        scale = 0.1f + 0.9f * (scale * scale);
+        sample *= scale;
+#else
+        glm::vec3 sample;
+        sample.x = random_float(-1.0f, 1.0f);
+        sample.y = random_float(-1.0f, 1.0f);
+        sample.z = 0.0f;
+#endif
+        ssao_kernel[i] = glm::vec4(sample, 0.0f);
+    }
+    
+    backend->update_buffer(&ssao_kernel_uniform_buffer, 0, sizeof(ssao_kernel), ssao_kernel);
     
     return true;
 }
@@ -126,11 +153,9 @@ void Scene_Renderer::render() {
     per_scene_uniforms.projection_matrix = projection_matrix;
     per_scene_uniforms.view_matrix       = view_matrix;
 
-    //per_scene_uniforms.ssao_radius       = 0.5f;
-    per_scene_uniforms.ssao_radius       = 5.0f;
-    //per_scene_uniforms.ssao_bias         = 0.025f;
-    per_scene_uniforms.ssao_bias         = 0.005f;
-    per_scene_uniforms.ssao_noise_scale  = glm::vec2(extent.width / 4.0f, extent.height / 4.0f);
+    per_scene_uniforms.ssao_radius       = 0.5f;
+    per_scene_uniforms.ssao_bias         = 0.025f;
+    per_scene_uniforms.ssao_noise_scale  = glm::vec2(extent.width / NOISE_TEXTURE_WIDTH, extent.height / NOISE_TEXTURE_HEIGHT);
     
     memcpy(per_scene_uniforms.lights, lights, MAX_LIGHTS * sizeof(Light));
 
@@ -857,13 +882,13 @@ bool Scene_Renderer::create_fullscreen_quad_vulkan_objects() {
 
     if (!backend->create_descriptor_sets(fullscreen_quad_descriptor_pool, fullscreen_quad_descriptor_set_layout, MAX_RESOLVE_PASSES * Render_Backend::MAX_FRAMES_IN_FLIGHT, fullscreen_quad_descriptor_sets)) return false;
 
+    if (!backend->create_buffer(&ssao_kernel_uniform_buffer, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, SSAO_KERNEL_SIZE * sizeof(glm::vec4), NULL)) {
+        return false;
+    }
+    
     for (int i = 0; i < Render_Backend::MAX_FRAMES_IN_FLIGHT; i++) {
-        if (!backend->create_buffer(&ssao_kernel_uniform_buffers[i], VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, SSAO_KERNEL_SIZE * sizeof(glm::vec4), NULL)) {
-            return false;
-        }
-
         for (int j = 0; j < MAX_RESOLVE_PASSES; j++) {
-            backend->update_descriptor_set(fullscreen_quad_descriptor_sets[i * Render_Backend::MAX_FRAMES_IN_FLIGHT + j], 0, &ssao_kernel_uniform_buffers[i]);
+            backend->update_descriptor_set(fullscreen_quad_descriptor_sets[i * Render_Backend::MAX_FRAMES_IN_FLIGHT + j], 0, &ssao_kernel_uniform_buffer);
         }
     }
     

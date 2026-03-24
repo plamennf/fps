@@ -26,19 +26,32 @@ layout(set = 1, binding = 1) uniform sampler2D ao_texture;
 layout(set = 1, binding = 2) uniform sampler2D normal_texture;
 layout(set = 1, binding = 3) uniform sampler2D depth_texture;
 
-void main() {
+const int radius = 4;
+const float weights[2*radius+1] = float[](
+    0.05, 0.09, 0.12, 0.15, 0.18, 0.15, 0.12, 0.09, 0.05
+);
+
+void main()
+{
     vec2 texel_size = 1.0 / vec2(textureSize(ao_texture, 0));
 
-    float result = 0.0;
-
-    for (int x = -2; x < 2; ++x) {
-        for (int y = -2; y < 2; ++y) {
-            vec2 offset = vec2(float(x), float(y)) * texel_size;
-            result += texture(ao_texture, frag_uv + offset).r;
-        }
+    float sum = 0.0;
+    for (int i = -radius; i <= radius; i++) {
+        vec2 offset = vec2(float(i), 0.0) * texel_size;
+        sum += texture(ao_texture, frag_uv + offset).r * weights[i + radius];
     }
 
-    output_ao = result / 16.0;
+    float horizontal = sum;
+
+    sum = 0.0;
+    for (int i = -radius; i <= radius; i++) {
+        vec2 offset = vec2(0.0, float(i)) * texel_size;
+        sum += texture(ao_texture, frag_uv + offset).r * weights[i + radius];
+    }
+
+    float vertical = sum;
+
+    output_ao = (horizontal + vertical) * 0.5;
 }
 
 #endif

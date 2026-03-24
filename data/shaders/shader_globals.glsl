@@ -342,7 +342,8 @@ vec3 calculate_lighting(vec2 frag_uv, vec4 frag_color, vec3 world_normal, mat3 T
 #ifdef USE_INSTANCING
     float ssao   = 1.0;
 #else
-    float ssao   = texture(ssao_blur_texture, vec2(frag_uv.x, 1.0 - frag_uv.y)).r;
+    //float ssao   = texture(ssao_blur_texture, vec2(frag_uv.x, 1.0 - frag_uv.y)).r;
+    float ssao   = texture(ssao_blur_texture, frag_uv).r;
 #endif
     vec3 ambient = ssao * albedo * ao * 0.03;
     vec3 color   = ambient + Lo + emissive;

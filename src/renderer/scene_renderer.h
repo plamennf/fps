@@ -20,7 +20,7 @@ struct Scene_Renderer {
     static const int MAX_RESOLVE_PASSES  = 3;
     static const int MAX_RENDER_PASSES   = MAX_SHADOW_CASCADES + 1;
     static const int MAX_RENDER_ENTITIES = 1024;
-    static const int SSAO_KERNEL_SIZE    = 64;
+    static const int SSAO_KERNEL_SIZE    = 192;
     
     bool init(Render_Backend *backend, Renderer_2D *renderer_2d);
 
@@ -98,7 +98,7 @@ private:
     VkDescriptorPool fullscreen_quad_descriptor_pool;
     VkDescriptorSetLayout fullscreen_quad_descriptor_set_layout;
     VkDescriptorSet fullscreen_quad_descriptor_sets[MAX_RESOLVE_PASSES * Render_Backend::MAX_FRAMES_IN_FLIGHT];
-    Gpu_Buffer ssao_kernel_uniform_buffers[Render_Backend::MAX_FRAMES_IN_FLIGHT];
+    Gpu_Buffer ssao_kernel_uniform_buffer;
     VkPipelineLayout fullscreen_quad_pipeline_layout;
     Gpu_Buffer fullscreen_quad_vertex_buffer;
     Gpu_Buffer fullscreen_quad_index_buffer;
