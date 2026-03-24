@@ -8,6 +8,6 @@ msbuild fps.slnx -v:m -p:Configuration=Debug
 msbuild fps.slnx -v:m -p:Configuration=Release
 REM msbuild fps.slnx -v:m -p:Configuration=Dist
 
-REM xcopy /y /d external\lib\*.dll build\Debug
+xcopy /y /d external\lib\*.dll build\Debug
 xcopy /y /d external\lib\*.dll build\Release
 REM xcopy /y /d external\lib\*.dll build\Dist

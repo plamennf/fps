@@ -84,8 +84,10 @@ bool Renderer_2D::init(Render_Backend *_backend) {
     quad_pipepline_info.depth_test_mode = DEPTH_TEST_MODE_OFF;
     quad_pipepline_info.depth_write     = false;
     quad_pipepline_info.color_write     = true;
-    
-    quad_pipepline_info.color_attachment_format = backend->get_swap_chain_surface_format();
+
+    quad_pipepline_info.num_color_attachment_formats = 1;
+    VkFormat format = backend->get_swap_chain_surface_format();
+    quad_pipepline_info.color_attachment_formats = &format;
     quad_pipepline_info.depth_attachment_format = VK_FORMAT_D32_SFLOAT;
     
     if (!backend->create_graphics_pipeline(quad_pipepline_info, &quad_pipeline)) {

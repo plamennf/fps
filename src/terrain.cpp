@@ -122,13 +122,28 @@ float noise(float x, float z) {
 }
 
 float Terrain_Chunk::get_height(float x, float z) {
-    float frequency = 0.05f;
-    float amplitude = 10.0f;
+    float height = 0.0f;
+    float amplitude = 20.0f;
+    float frequency = 0.01f;
+    float persistence = 0.5f;
+    int octaves = 4;
 
-    return glm::sin(x * frequency) * glm::cos(z * frequency) * amplitude;
+    for (int i = 0; i < octaves; i++) {
+        float seed_offset_x = seed * 10.0f;
+        float seed_offset_z = seed * 20.0f;
+        
+        height += glm::perlin(glm::vec2(x + seed_offset_x, z + seed_offset_z) * frequency) * amplitude;
+        frequency *= 2.0f;
+        amplitude *= persistence;
+    }
+
+    //height = glm::pow(height, 1.5f);
+    
+    return height;
 }
 
-bool Terrain_Chunk::generate(u32 seed, int _num_vertices_per_side, float _scale, glm::vec3 _offset, int num_objects_to_place) {
+bool Terrain_Chunk::generate(u32 _seed, int _num_vertices_per_side, float _scale, glm::vec3 _offset, int num_objects_to_place) {
+    seed                  = _seed;
     num_vertices_per_side = _num_vertices_per_side;
     scale                 = _scale;
     offset                = _offset;

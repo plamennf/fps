@@ -860,35 +860,37 @@ bool Render_Backend::create_graphics_pipeline(Graphics_Pipeline_Info info, VkPip
     multisampling.alphaToCoverageEnable = VK_FALSE;
     multisampling.alphaToOneEnable = VK_FALSE;
 
-    VkPipelineColorBlendAttachmentState color_blend_attachment = {};
+    VkPipelineColorBlendAttachmentState color_blend_attachments[4] = {};
+    
+    for (int i = 0; i < ArrayCount(color_blend_attachments); i++) {
+        if (info.color_write) {
+            color_blend_attachments[i].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+        }
 
-    if (info.color_write) {
-        color_blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+        switch (info.blend_mode) {
+            case BLEND_MODE_OFF: {
+                color_blend_attachments[i].blendEnable = VK_FALSE;
+            } break;
+
+            case BLEND_MODE_ALPHA: {
+                color_blend_attachments[i].blendEnable = VK_TRUE;
+            } break;
+        }
+
+        color_blend_attachments[i].srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+        color_blend_attachments[i].dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+        color_blend_attachments[i].colorBlendOp = VK_BLEND_OP_ADD;
+        color_blend_attachments[i].srcAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+        color_blend_attachments[i].dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+        color_blend_attachments[i].alphaBlendOp = VK_BLEND_OP_ADD;
     }
-
-    switch (info.blend_mode) {
-        case BLEND_MODE_OFF: {
-            color_blend_attachment.blendEnable = VK_FALSE;
-        } break;
-
-        case BLEND_MODE_ALPHA: {
-            color_blend_attachment.blendEnable = VK_TRUE;
-        } break;
-    }
-
-    color_blend_attachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-    color_blend_attachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-    color_blend_attachment.colorBlendOp = VK_BLEND_OP_ADD;
-    color_blend_attachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-    color_blend_attachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-    color_blend_attachment.alphaBlendOp = VK_BLEND_OP_ADD;
 
     VkPipelineColorBlendStateCreateInfo color_blending = {};
     color_blending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
     color_blending.logicOpEnable = VK_FALSE;
     color_blending.logicOp = VK_LOGIC_OP_COPY;
-    color_blending.attachmentCount = 1;
-    color_blending.pAttachments = &color_blend_attachment;
+    color_blending.attachmentCount = info.num_color_attachment_formats;
+    color_blending.pAttachments = color_blend_attachments;
     color_blending.blendConstants[0] = 0.0f;
     color_blending.blendConstants[1] = 0.0f;
     color_blending.blendConstants[2] = 0.0f;
@@ -896,9 +898,9 @@ bool Render_Backend::create_graphics_pipeline(Graphics_Pipeline_Info info, VkPip
 
     VkPipelineRenderingCreateInfoKHR pipeline_create = {};
     pipeline_create.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR;
-    pipeline_create.colorAttachmentCount = info.color_attachment_format != VK_FORMAT_UNDEFINED ? 1 : 0;
+    pipeline_create.colorAttachmentCount = info.num_color_attachment_formats;
     //pipeline_create.pColorAttachmentFormats = &swap_chain_surface_format.format;
-    pipeline_create.pColorAttachmentFormats = info.color_attachment_format != VK_FORMAT_UNDEFINED ? &info.color_attachment_format : NULL;
+    pipeline_create.pColorAttachmentFormats = info.color_attachment_formats;
     
     if (info.depth_attachment_format != VK_FORMAT_UNDEFINED) {
         pipeline_create.depthAttachmentFormat = info.depth_attachment_format;
@@ -1382,13 +1384,23 @@ bool Render_Backend::create_framebuffer(Texture *texture, int width, int height,
 
     VkSamplerCreateInfo sampler_info = {};
     sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-    sampler_info.minFilter = VK_FILTER_LINEAR;
-    sampler_info.magFilter = VK_FILTER_LINEAR;
-    sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    sampler_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-    sampler_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-    sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+    if (format != VK_FORMAT_R16_SFLOAT) {
+        sampler_info.minFilter = VK_FILTER_LINEAR;
+        sampler_info.magFilter = VK_FILTER_LINEAR;
+        sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        sampler_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+        sampler_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+        sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+    } else {
+        sampler_info.minFilter = VK_FILTER_NEAREST;
+        sampler_info.magFilter = VK_FILTER_NEAREST;
+        sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+        sampler_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        sampler_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    }
     sampler_info.maxAnisotropy = 1;
+    sampler_info.compareEnable = VK_FALSE;
     sampler_info.compareOp = VK_COMPARE_OP_ALWAYS;
     sampler_info.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
 
@@ -1400,7 +1412,7 @@ bool Render_Backend::create_framebuffer(Texture *texture, int width, int height,
     return true;
 }
 
-bool Render_Backend::create_texture(Texture *texture, int width, int height, VkFormat format, u8 *data, char *filepath) {
+bool Render_Backend::create_texture(Texture *texture, int width, int height, VkFormat format, void *data, char *filepath) {
     VkImageCreateInfo image_create_info = {};
     image_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
@@ -1427,6 +1439,8 @@ bool Render_Backend::create_texture(Texture *texture, int width, int height, VkF
         return false;
     }
 
+    texture->format = format;
+    
     if (data) {
         if (!update_texture(texture, 0, 0, width, height, data)) {
             return false;
@@ -1493,8 +1507,15 @@ void Render_Backend::destroy_texture(Texture *texture) {
     }
 }
 
-bool Render_Backend::update_texture(Texture *texture, int x, int y, int width, int height, u8 *data) {
-    VkDeviceSize layer_size = (VkDeviceSize)width * (VkDeviceSize)height * (VkDeviceSize)4;
+bool Render_Backend::update_texture(Texture *texture, int x, int y, int width, int height, void *data) {
+    VkDeviceSize bpp;
+    if (texture->format == VK_FORMAT_R16G16B16A16_SFLOAT) {
+        bpp = 2 * sizeof(float);
+    } else {
+        bpp = 4;
+    }
+    
+    VkDeviceSize layer_size = (VkDeviceSize)width * (VkDeviceSize)height * bpp;
     int layer_count = 1;
     VkDeviceSize image_size = layer_count * layer_size;
 

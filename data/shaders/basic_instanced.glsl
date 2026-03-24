@@ -40,7 +40,7 @@ void main() {
 layout(location = 0) out vec4 output_color;
 
 void main() {
-    vec3 color = calculate_lighting(frag_uv, frag_color, world_normal, TBN, world_position, view_position);
+    vec3 color  = calculate_lighting(frag_uv, frag_color, world_normal, TBN, world_position, view_position);
     output_color = vec4(color, 1.0);
 }
 

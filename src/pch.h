@@ -6,6 +6,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/norm.hpp>
+#include <glm/gtc/noise.hpp>
 #include <eastl/vector.h>
 #include <eastl/unordered_map.h>
 #include <eastl/string.h>

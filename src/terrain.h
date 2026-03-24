@@ -25,6 +25,8 @@ struct Terrain_Object_Instance_Data {
 };
 
 struct Terrain_Chunk {
+    u32 seed;
+    
     int num_vertices_per_side;
     float scale;
     glm::vec3 offset;

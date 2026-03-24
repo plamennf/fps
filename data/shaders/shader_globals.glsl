@@ -31,6 +31,9 @@ layout(set = 0, binding = 0) uniform Per_Scene {
     vec4 cascade_splits[MAX_SHADOW_CASCADES];
     Light lights[MAX_LIGHTS];
     vec3 camera_position;
+    float ssao_radius;
+    vec2 ssao_noise_scale;
+    float ssao_bias;
 } per_scene;
 
 layout(set = 1, binding = 0) uniform Material {
@@ -42,12 +45,14 @@ layout(set = 1, binding = 0) uniform Material {
 
 #ifdef VERTEX_SHADER
 
+#ifndef USE_IMMEDIATE_VERTEX
 layout(location = 0) in vec3 in_position;
 layout(location = 1) in vec4 in_color;
 layout(location = 2) in vec2 in_uv;
 layout(location = 3) in vec3 in_normal;
 layout(location = 4) in vec3 in_tangent;
 layout(location = 5) in vec3 in_bitangent;
+#endif
 
 #ifdef USE_INSTANCING
 
@@ -79,6 +84,7 @@ layout(set = 0, binding = 1) uniform sampler2D shadow_map_0;
 layout(set = 0, binding = 2) uniform sampler2D shadow_map_1;
 layout(set = 0, binding = 3) uniform sampler2D shadow_map_2;
 layout(set = 0, binding = 4) uniform sampler2D shadow_map_3;
+layout(set = 0, binding = 5) uniform sampler2D ssao_blur_texture;
 
 struct Cascade_Data {
     int index0;
@@ -224,6 +230,10 @@ vec3 fresnel_schlick(float cos_theta, vec3 F0) {
 
 vec3 calculate_lighting(vec2 frag_uv, vec4 frag_color, vec3 world_normal, mat3 TBN, vec3 world_position, vec3 view_position) {
     vec4 full_albedo = texture(albedo_texture, frag_uv);
+#ifdef FRAGMENT_SHADER
+    if (full_albedo.a < 0.5) discard;
+#endif
+    
     vec3 albedo      = full_albedo.rgb * material.albedo_factor.xyz * frag_color.rgb;
     
     vec3 normal      = world_normal;
@@ -329,10 +339,16 @@ vec3 calculate_lighting(vec2 frag_uv, vec4 frag_color, vec3 world_normal, mat3 T
         Lo += ((kD * albedo / PI + specular) * radiance * NdotL) * s;
     }
 
-    vec3 ambient = vec3(0.03) * albedo * ao;
+#ifdef USE_INSTANCING
+    float ssao   = 1.0;
+#else
+    float ssao   = texture(ssao_blur_texture, vec2(frag_uv.x, 1.0 - frag_uv.y)).r;
+#endif
+    vec3 ambient = ssao * albedo * ao * 0.03;
     vec3 color   = ambient + Lo + emissive;
 
-    const float density  = 0.007;
+    //const float density  = 0.007;
+    const float density  = 0.005;
     const float gradient = 1.5;
     
     float distance_to_camera = length(view_position);

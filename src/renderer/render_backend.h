@@ -41,6 +41,9 @@ struct Per_Scene_Uniforms {
     glm::vec4 cascade_splits[MAX_SHADOW_CASCADES];  // We are wasting memory right now because of hlsl alignment rules. If we end up with a MAX_SHADOW_CASCADES value which is a multiple of 4 we can fix this.
     Light lights[MAX_LIGHTS];
     glm::vec3 camera_position;
+    float ssao_radius;
+    glm::vec2 ssao_noise_scale;
+    float ssao_bias;
     float _padding0;
 };
 
@@ -141,7 +144,8 @@ struct Graphics_Pipeline_Info {
     bool depth_write;
     bool color_write;
 
-    VkFormat color_attachment_format;
+    int num_color_attachment_formats;
+    VkFormat *color_attachment_formats;
     VkFormat depth_attachment_format;
 };
 
@@ -161,7 +165,7 @@ struct Render_Backend {
     bool end_frame();
     
     bool load_texture(Texture *texture, char *filepath);
-    bool create_texture(Texture *texture, int width, int height, VkFormat format, u8 *data, char *filepath = "(unknown)");
+    bool create_texture(Texture *texture, int width, int height, VkFormat format, void *data, char *filepath = "(unknown)");
     
     VkCommandBuffer get_current_command_buffer(bool reset = true);
     VkImage get_current_swap_chain_image();
@@ -197,7 +201,7 @@ struct Render_Backend {
 
     bool create_framebuffer(Texture *texture, int width, int height, VkFormat format);
     void destroy_texture(Texture *texture);
-    bool update_texture(Texture *texture, int x, int y, int width, int height, u8 *data);
+    bool update_texture(Texture *texture, int x, int y, int width, int height, void *data);
     
     void imgui_init();
     void imgui_begin_frame();
