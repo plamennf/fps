@@ -49,3 +49,12 @@ struct Rectangle2i {
     int width;
     int height;
 };
+
+struct Plane {
+    glm::vec3 normal;
+    float d;
+};
+
+struct Frustum {
+    Plane planes[6];
+};

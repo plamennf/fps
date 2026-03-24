@@ -41,9 +41,6 @@ struct Per_Scene_Uniforms {
     glm::vec4 cascade_splits[MAX_SHADOW_CASCADES];  // We are wasting memory right now because of hlsl alignment rules. If we end up with a MAX_SHADOW_CASCADES value which is a multiple of 4 we can fix this.
     Light lights[MAX_LIGHTS];
     glm::vec3 camera_position;
-    float ssao_radius;
-    glm::vec2 ssao_noise_scale;
-    float ssao_bias;
     float _padding0;
 };
 
@@ -150,11 +147,11 @@ struct Graphics_Pipeline_Info {
 };
 
 struct Render_Backend {
-    static const int MAX_FRAMES_IN_FLIGHT = 2;
+    static const int MAX_FRAMES_IN_FLIGHT = 3;
 
     char selected_gpu_name[VK_MAX_PHYSICAL_DEVICE_NAME_SIZE];
     
-    bool init(SDL_Window *window);
+    bool init(SDL_Window *window, bool vsync);
 
     void device_wait_idle();
     void wait_on_all_fences();
@@ -214,7 +211,7 @@ private:
     bool select_physical_device();
     bool create_logical_device();
     bool init_vma();
-    bool create_swap_chain();
+    bool create_swap_chain(bool vsync);
     bool create_image_views();
     bool create_command_pool();
     bool create_command_buffer();
@@ -229,7 +226,7 @@ private:
     Queue_Family_Indices find_queue_families(VkPhysicalDevice device);
     Swap_Chain_Support_Details query_swap_chain_support(VkPhysicalDevice device);
     VkSurfaceFormatKHR choose_swap_surface_format(int num_available_formats, VkSurfaceFormatKHR *available_formats);
-    VkPresentModeKHR choose_swap_present_mode(int num_available_present_modes, VkPresentModeKHR *available_present_modes);
+    VkPresentModeKHR choose_swap_present_mode(int num_available_present_modes, VkPresentModeKHR *available_present_modes, bool vsync);
     VkExtent2D choose_swap_extent(SDL_Window *window, VkSurfaceCapabilitiesKHR capabilities);
     bool is_device_suitable(VkPhysicalDevice device);
     int rate_device_suitability(VkPhysicalDevice device);
@@ -278,4 +275,5 @@ private:
 public:
     u32 current_frame = 0;
     u32 image_index = 0;
+    bool should_vsync = false;
 };

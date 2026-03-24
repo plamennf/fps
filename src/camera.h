@@ -38,3 +38,5 @@ void init_camera(Camera *camera, glm::vec3 position, float pitch, float yaw, flo
 void update_camera(Camera *camera, Camera_Type type, float dt);
 void fixed_update_camera(Camera *camera, Camera_Type type, float dt, Terrain_Chunk *chunk);
 glm::mat4 get_view_matrix(Camera *camera);
+glm::mat4 get_projection_matrix(Camera *camera, float aspect_ratio);
+Frustum get_camera_frustum(glm::mat4 vp);

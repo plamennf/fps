@@ -7,8 +7,17 @@
 #include "mesh_registry.h"
 #include "../terrain.h"
 
-static const int NOISE_TEXTURE_WIDTH  = 16;
-static const int NOISE_TEXTURE_HEIGHT = 16;
+static float get_bounding_sphere_radius(Mesh *mesh, float scale) {
+    return mesh->bounds_radius * scale;
+}
+
+static bool sphere_in_frustum(glm::vec3 center, float radius, Frustum frustum) {
+    for (int i = 0; i < 6; i++) {
+        float distance = glm::dot(frustum.planes[i].normal, center) + frustum.planes[i].d;
+        if (distance < -radius) return false;
+    }
+    return true;
+}
 
 bool Scene_Renderer::init(Render_Backend *_backend, Renderer_2D *_renderer_2d) {
     backend = _backend;
@@ -23,42 +32,6 @@ bool Scene_Renderer::init(Render_Backend *_backend, Renderer_2D *_renderer_2d) {
     if (!init_framebuffers()) {
         return false;
     }
-
-    glm::vec4 noise_data[NOISE_TEXTURE_WIDTH * NOISE_TEXTURE_HEIGHT];
-    for (int i = 0; i < NOISE_TEXTURE_WIDTH * NOISE_TEXTURE_HEIGHT; i++) {
-        float x = random_float(-1.0f, 1.0f);
-        float y = random_float(-1.0f, 1.0f);
-        float z = random_float(+0.0f, 1.0f);
-
-        glm::vec3 v = glm::normalize_or_zero(glm::vec3(x, y, z));
-
-        noise_data[i] = glm::vec4(v, 0.0f);
-    }
-
-    if (!backend->create_texture(&ssao_noise_texture, NOISE_TEXTURE_WIDTH, NOISE_TEXTURE_HEIGHT, VK_FORMAT_R16G16B16A16_SFLOAT, noise_data)) return false;
-
-    glm::vec4 ssao_kernel[SSAO_KERNEL_SIZE];
-
-    for (int i = 0; i < SSAO_KERNEL_SIZE; i++) {
-#if 1
-        glm::vec3 sample(
-            random_float(-1.0f, 1.0f),
-            random_float(-1.0f, 1.0f),
-            random_float(0.0f, 1.0f) );
-        sample = glm::normalize_or_zero(sample);
-        float scale = float(i) / float(SSAO_KERNEL_SIZE);
-        scale = 0.1f + 0.9f * (scale * scale);
-        sample *= scale;
-#else
-        glm::vec3 sample;
-        sample.x = random_float(-1.0f, 1.0f);
-        sample.y = random_float(-1.0f, 1.0f);
-        sample.z = 0.0f;
-#endif
-        ssao_kernel[i] = glm::vec4(sample, 0.0f);
-    }
-    
-    backend->update_buffer(&ssao_kernel_uniform_buffer, 0, sizeof(ssao_kernel), ssao_kernel);
     
     return true;
 }
@@ -67,25 +40,9 @@ void Scene_Renderer::destroy_framebuffers() {
     if (depth_buffer.image) {
         backend->destroy_texture(&depth_buffer);
     }
-
-    if (position_buffer.image) {
-        backend->destroy_texture(&position_buffer);
-    }
-
-    if (normal_buffer.image) {
-        backend->destroy_texture(&normal_buffer);
-    }
     
     if (offscreen_buffer.image) {
         backend->destroy_texture(&offscreen_buffer);
-    }
-
-    if (ssao_buffer.image) {
-        backend->destroy_texture(&ssao_buffer);
-    }
-
-    if (ssao_blur_buffer.image) {
-        backend->destroy_texture(&ssao_blur_buffer);
     }
     
     for (int i = 0; i < MAX_SHADOW_CASCADES; i++) {
@@ -99,29 +56,23 @@ bool Scene_Renderer::init_framebuffers() {
     if (!backend->create_framebuffer(&depth_buffer, backend->get_swap_chain_extent().width, backend->get_swap_chain_extent().height, VK_FORMAT_D32_SFLOAT)) {
         return false;
     }
-
-    if (!backend->create_framebuffer(&position_buffer, backend->get_swap_chain_extent().width, backend->get_swap_chain_extent().height, VK_FORMAT_R16G16B16A16_SFLOAT)) {
-        return false;
-    }
-
-    if (!backend->create_framebuffer(&normal_buffer, backend->get_swap_chain_extent().width, backend->get_swap_chain_extent().height, VK_FORMAT_R16G16B16A16_SFLOAT)) {
-        return false;
-    }
     
     if (!backend->create_framebuffer(&offscreen_buffer, backend->get_swap_chain_extent().width, backend->get_swap_chain_extent().height, VK_FORMAT_R16G16B16A16_SFLOAT)) {
         return false;
     }
-
-    if (!backend->create_framebuffer(&ssao_buffer, backend->get_swap_chain_extent().width, backend->get_swap_chain_extent().height, VK_FORMAT_R16_SFLOAT)) {
-        return false;
-    }
-
-    if (!backend->create_framebuffer(&ssao_blur_buffer, backend->get_swap_chain_extent().width, backend->get_swap_chain_extent().height, VK_FORMAT_R16_SFLOAT)) {
-        return false;
-    }
     
     for (int i = 0; i < MAX_SHADOW_CASCADES; i++) {
-        if (!backend->create_framebuffer(&shadow_map_buffers[i], SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT, VK_FORMAT_D32_SFLOAT)) {
+        int width  = SHADOW_MAP_WIDTH;
+        int height = SHADOW_MAP_HEIGHT;
+        if (i == 2) {
+            width  /= 2;
+            height /= 2;
+        } else if (i == 3) {
+            width  /= 4;
+            height /= 4;
+        }
+        
+        if (!backend->create_framebuffer(&shadow_map_buffers[i], width, height, VK_FORMAT_D32_SFLOAT)) {
             return false;
         }
 
@@ -130,10 +81,6 @@ bool Scene_Renderer::init_framebuffers() {
         }
     }
 
-    for (int j = 0; j < Render_Backend::MAX_FRAMES_IN_FLIGHT; j++) {
-        backend->update_descriptor_set(per_scene_uniforms_descriptor_sets[j], MAX_SHADOW_CASCADES + 1, &ssao_blur_buffer);
-    }
-    
     return true;
 }
 
@@ -145,17 +92,14 @@ void Scene_Renderer::render() {
     VkExtent2D extent = backend->get_swap_chain_extent();
 
     float aspect_ratio = extent.width / (extent.height > 0 ? (float)extent.height : 1.0f);
-    glm::mat4 projection_matrix = glm::perspective(glm::radians(camera.fov), aspect_ratio, camera.z_near, camera.z_far);
+    glm::mat4 projection_matrix = get_projection_matrix(&camera, aspect_ratio);
     projection_matrix[1][1] *= -1;
     glm::mat4 view_matrix = get_view_matrix(&camera);
+    camera_frustum = get_camera_frustum(projection_matrix * view_matrix);
 
     Per_Scene_Uniforms per_scene_uniforms;
     per_scene_uniforms.projection_matrix = projection_matrix;
     per_scene_uniforms.view_matrix       = view_matrix;
-
-    per_scene_uniforms.ssao_radius       = 0.5f;
-    per_scene_uniforms.ssao_bias         = 0.025f;
-    per_scene_uniforms.ssao_noise_scale  = glm::vec2(extent.width / NOISE_TEXTURE_WIDTH, extent.height / NOISE_TEXTURE_HEIGHT);
     
     memcpy(per_scene_uniforms.lights, lights, MAX_LIGHTS * sizeof(Light));
 
@@ -178,7 +122,7 @@ void Scene_Renderer::render() {
     current_render_stage = RENDER_STAGE_SHADOWS;
     
     for (int i = 0; i < MAX_SHADOW_CASCADES; i++) {
-        begin_rendering(cb, 0, NULL, &shadow_map_buffers[i], {SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT}, NULL, 1.0f, 0);
+        begin_rendering(cb, 0, NULL, &shadow_map_buffers[i], {(u32)shadow_map_buffers[i].width, (u32)shadow_map_buffers[i].height}, NULL, 1.0f, 0);
 
         render_all_entities(cb, i);
 
@@ -186,43 +130,10 @@ void Scene_Renderer::render() {
 
         backend->image_layout_transition(cb, shadow_map_buffers[i].image, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, { VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1 });
     }
-
-    // Draw z-prepass
-    Texture framebuffers[] = { normal_buffer, position_buffer };
-    glm::vec4 clear_colors[] = { glm::vec4(0.0f), glm::vec4(0.0f) };
-    begin_rendering(cb, 2, framebuffers, &depth_buffer, extent, clear_colors, 1.0f, 0);
-    current_render_stage = RENDER_STAGE_Z_PREPASS;
-    render_all_entities(cb);
-    end_rendering(cb);
-
-    backend->image_layout_transition(cb, position_buffer.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 });
-    backend->image_layout_transition(cb, normal_buffer.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 });
-    backend->image_layout_transition(cb, depth_buffer.image, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, { VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1 });
-
-    // Draw ssao passes
-
-    VkDescriptorSet descriptor_set = fullscreen_quad_descriptor_sets[backend->current_frame * MAX_RESOLVE_PASSES];
-    backend->update_descriptor_set(descriptor_set, 1, &position_buffer);
-    backend->update_descriptor_set(descriptor_set, 2, &normal_buffer);
-    backend->update_descriptor_set(descriptor_set, 3, &depth_buffer);
-    backend->update_descriptor_set(descriptor_set, 4, &ssao_noise_texture);
-    glm::vec4 ssao_clear_color = glm::vec4(0);
-    begin_rendering(cb, 1, &ssao_buffer, NULL, extent, &ssao_clear_color, 1.0f, 0);
-    draw_fullscreen_quad(cb, ssao_pipeline, descriptor_set);
-    end_rendering(cb);
-    backend->image_layout_transition(cb, ssao_buffer.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 });
-    
-    descriptor_set = fullscreen_quad_descriptor_sets[backend->current_frame * MAX_RESOLVE_PASSES + 1];
-    backend->update_descriptor_set(descriptor_set, 1, &ssao_buffer);
-    
-    begin_rendering(cb, 1, &ssao_blur_buffer, NULL, extent, &ssao_clear_color, 1.0f, 0);
-    draw_fullscreen_quad(cb, ssao_blur_pipeline, descriptor_set);
-    end_rendering(cb);
-    backend->image_layout_transition(cb, ssao_blur_buffer.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 });
     
     // Draw main pass
     glm::vec4 offscreen_buffer_clear_color = glm::vec4(0.2f, 0.5f, 0.8f, 1.0f);
-    begin_rendering(cb, 1, &offscreen_buffer, &depth_buffer, extent, &offscreen_buffer_clear_color, -1.0f, 0);
+    begin_rendering(cb, 1, &offscreen_buffer, &depth_buffer, extent, &offscreen_buffer_clear_color, 1.0f, 0);
     current_render_stage = RENDER_STAGE_MAIN;
     render_all_entities(cb);
     end_rendering(cb);
@@ -233,15 +144,9 @@ void Scene_Renderer::render() {
     glm::vec4 clear_color = glm::vec4(0, 0, 0, 1);
     begin_rendering(cb, 1, &back_buffer, NULL, extent, &clear_color, 1.0f, 0);
 
-    descriptor_set = fullscreen_quad_descriptor_sets[backend->current_frame * MAX_RESOLVE_PASSES + 2];
-    backend->update_descriptor_set(descriptor_set, 1, &offscreen_buffer);
+    VkDescriptorSet descriptor_set = fullscreen_quad_descriptor_sets[backend->current_frame * MAX_RESOLVE_PASSES];
+    backend->update_descriptor_set(descriptor_set, 0, &offscreen_buffer);
     draw_fullscreen_quad(cb, resolve_pipeline, descriptor_set);
-
-    /*
-    renderer_2d->begin_2d(extent, resolve_pipeline);
-    renderer_2d->draw_quad(&offscreen_buffer, {0, 0}, {(float)extent.width, (float)extent.height}, FLIP_MODE_VERTICALLY, NULL, glm::vec4(1, 1, 1, 1));
-    renderer_2d->end_2d(cb);
-    */
     
     renderer_2d->begin_2d(extent);
     draw_hud(extent);
@@ -352,7 +257,7 @@ void Scene_Renderer::render_all_entities(VkCommandBuffer cb, int cascade_index) 
     //
     // Draw instanced objects
     //
-    
+
     for (int i = 0; i < terrain_chunks.size(); i++) {
         MyZoneScopedN("Render one terrain chunk");
         
@@ -362,10 +267,6 @@ void Scene_Renderer::render_all_entities(VkCommandBuffer cb, int cascade_index) 
             MyZoneScopedN("Render terrain mesh");
             
             switch (current_render_stage) {
-                case RENDER_STAGE_Z_PREPASS: {
-                    pipeline_for_current_pass = z_prepass_pipeline;
-                } break;
-                
                 case RENDER_STAGE_SHADOWS: {
                     pipeline_for_current_pass = shadow_pipeline;
                 } break;
@@ -385,46 +286,43 @@ void Scene_Renderer::render_all_entities(VkCommandBuffer cb, int cascade_index) 
             draw_mesh(cb, (Mesh *)&chunk.mesh, world_matrix, glm::vec4(0, 1, 0, 1), cascade_index);
         }
 
-        if (current_render_stage != RENDER_STAGE_Z_PREPASS) {
-            int instance_buffer_index = MAX_RENDER_PASSES * backend->current_frame;
-            switch (current_render_stage) {
-                case RENDER_STAGE_SHADOWS: {
-                    pipeline_for_current_pass = shadow_instanced_pipeline;
-                    instance_buffer_index += cascade_index;
-                } break;
+        int instance_buffer_index = MAX_RENDER_PASSES * backend->current_frame;
+        switch (current_render_stage) {
+            case RENDER_STAGE_SHADOWS: {
+                pipeline_for_current_pass = shadow_instanced_pipeline;
+                instance_buffer_index += cascade_index;
+            } break;
 
-                case RENDER_STAGE_MAIN: {
-                    pipeline_for_current_pass = mesh_instanced_pipeline;
-                    instance_buffer_index += MAX_SHADOW_CASCADES;
-                } break;
-            }
+            case RENDER_STAGE_MAIN: {
+                pipeline_for_current_pass = mesh_instanced_pipeline;
+                instance_buffer_index += MAX_SHADOW_CASCADES;
+            } break;
+        }
     
-            pipeline_layout_for_current_pass = mesh_instanced_pipeline_layout;
+        pipeline_layout_for_current_pass = mesh_instanced_pipeline_layout;
 
-            vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_for_current_pass);
-            vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_for_current_pass, 0, 1, &per_scene_uniforms_descriptor_sets[backend->current_frame], 0, NULL);
-
-            for (auto &batch : chunk.batches) {
-                MyZoneScopedN("Update data for terrain chunk batches");
+        vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_for_current_pass);
+        vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_for_current_pass, 0, 1, &per_scene_uniforms_descriptor_sets[backend->current_frame], 0, NULL);
+        for (auto &batch : chunk.batches) {
+            MyZoneScopedN("Update data for terrain chunk batches");
             
-                for (int i = batch.start_index; i < batch.start_index + batch.count; i++) {
-                    auto &object = chunk.objects[i];
+            for (int i = batch.start_index; i < batch.start_index + batch.count; i++) {
+                auto &object = chunk.objects[i];
 
-                    chunk.objects_instance_data[i].shadow_cascade_index = cascade_index;
-                }
+                chunk.objects_instance_data[i].shadow_cascade_index = cascade_index;
             }
+        }
 
-            Gpu_Buffer *instance_buffer = &chunk.instance_buffers[instance_buffer_index];
+        Gpu_Buffer *instance_buffer = &chunk.instance_buffers[instance_buffer_index];
         
-            {
-                MyZoneScopedN("Update instance buffer");
-                backend->update_buffer(instance_buffer, 0, chunk.objects_instance_data.size() * sizeof(Per_Object_Uniforms), chunk.objects_instance_data.data());
-            }
+        {
+            MyZoneScopedN("Update instance buffer");
+            backend->update_buffer(instance_buffer, 0, chunk.objects_instance_data.size() * sizeof(Per_Object_Uniforms), chunk.objects_instance_data.data());
+        }
             
-            for (auto const &batch : chunk.batches) {
-                MyZoneScopedN("Render one terrain chunk batch");
-                draw_mesh_instanced(cb, batch.mesh, instance_buffer, batch.start_index, batch.count);
-            }
+        for (auto const &batch : chunk.batches) {
+            MyZoneScopedN("Render one terrain chunk batch");
+            draw_mesh_instanced(cb, batch.mesh, instance_buffer, batch.start_index, batch.count);
         }
     }
 
@@ -433,10 +331,6 @@ void Scene_Renderer::render_all_entities(VkCommandBuffer cb, int cascade_index) 
     //
     
     switch (current_render_stage) {
-        case RENDER_STAGE_Z_PREPASS: {
-            pipeline_for_current_pass = z_prepass_pipeline;
-        } break;
-        
         case RENDER_STAGE_SHADOWS: {
             pipeline_for_current_pass = shadow_pipeline;
         } break;
@@ -780,14 +674,14 @@ bool Scene_Renderer::create_per_scene_vulkan_objects() {
     }
 
     eastl::vector <VkDescriptorSetLayoutBinding> per_scene_uniforms_descriptor_set_layout_bindings;
-    per_scene_uniforms_descriptor_set_layout_bindings.resize(2 + MAX_SHADOW_CASCADES);
+    per_scene_uniforms_descriptor_set_layout_bindings.resize(1 + MAX_SHADOW_CASCADES);
     
     per_scene_uniforms_descriptor_set_layout_bindings[0].binding         = 0;
     per_scene_uniforms_descriptor_set_layout_bindings[0].descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     per_scene_uniforms_descriptor_set_layout_bindings[0].descriptorCount = 1;
     per_scene_uniforms_descriptor_set_layout_bindings[0].stageFlags      = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
-    for (int i = 1; i < MAX_SHADOW_CASCADES + 2; i++) {
+    for (int i = 1; i < MAX_SHADOW_CASCADES + 1; i++) {
         per_scene_uniforms_descriptor_set_layout_bindings[i].binding         = i;
         per_scene_uniforms_descriptor_set_layout_bindings[i].descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         per_scene_uniforms_descriptor_set_layout_bindings[i].descriptorCount = 1;
@@ -850,47 +744,27 @@ bool Scene_Renderer::create_material_vulkan_objects() {
 }
 
 bool Scene_Renderer::create_fullscreen_quad_vulkan_objects() {
-    VkDescriptorPoolSize fullscreen_quad_pool_sizes[2] = {};
-    
-    fullscreen_quad_pool_sizes[0].type            = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    fullscreen_quad_pool_sizes[0].descriptorCount = MAX_RESOLVE_PASSES * Render_Backend::MAX_FRAMES_IN_FLIGHT;
+    VkDescriptorPoolSize fullscreen_quad_pool_sizes[1] = {};
 
-    fullscreen_quad_pool_sizes[1].type            = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    fullscreen_quad_pool_sizes[1].descriptorCount = MAX_RESOLVE_PASSES * 4 * Render_Backend::MAX_FRAMES_IN_FLIGHT;
+    fullscreen_quad_pool_sizes[0].type            = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    fullscreen_quad_pool_sizes[0].descriptorCount = MAX_RESOLVE_PASSES * 1 * Render_Backend::MAX_FRAMES_IN_FLIGHT;
 
-    if (!backend->create_descriptor_pool(&fullscreen_quad_descriptor_pool, ArrayCount(fullscreen_quad_pool_sizes), fullscreen_quad_pool_sizes, MAX_RESOLVE_PASSES * 4 * Render_Backend::MAX_FRAMES_IN_FLIGHT)) {
+    if (!backend->create_descriptor_pool(&fullscreen_quad_descriptor_pool, ArrayCount(fullscreen_quad_pool_sizes), fullscreen_quad_pool_sizes, MAX_RESOLVE_PASSES * 1 * Render_Backend::MAX_FRAMES_IN_FLIGHT)) {
         return false;
     }
 
-    VkDescriptorSetLayoutBinding fullscreen_quad_descriptor_set_layout_bindings[5] = {};
+    VkDescriptorSetLayoutBinding fullscreen_quad_descriptor_set_layout_bindings[1] = {};
 
     fullscreen_quad_descriptor_set_layout_bindings[0].binding = 0;
-    fullscreen_quad_descriptor_set_layout_bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    fullscreen_quad_descriptor_set_layout_bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     fullscreen_quad_descriptor_set_layout_bindings[0].descriptorCount = 1;
-    fullscreen_quad_descriptor_set_layout_bindings[0].stageFlags      = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-
-    for (int i = 1; i < 5; i++) {
-        fullscreen_quad_descriptor_set_layout_bindings[i].binding = i;
-        fullscreen_quad_descriptor_set_layout_bindings[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        fullscreen_quad_descriptor_set_layout_bindings[i].descriptorCount = 1;
-        fullscreen_quad_descriptor_set_layout_bindings[i].stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT;
-    }
+    fullscreen_quad_descriptor_set_layout_bindings[0].stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT;
 
     if (!backend->create_descriptor_set_layout(&fullscreen_quad_descriptor_set_layout, ArrayCount(fullscreen_quad_descriptor_set_layout_bindings), fullscreen_quad_descriptor_set_layout_bindings)) {
         return false;
     }
 
     if (!backend->create_descriptor_sets(fullscreen_quad_descriptor_pool, fullscreen_quad_descriptor_set_layout, MAX_RESOLVE_PASSES * Render_Backend::MAX_FRAMES_IN_FLIGHT, fullscreen_quad_descriptor_sets)) return false;
-
-    if (!backend->create_buffer(&ssao_kernel_uniform_buffer, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, SSAO_KERNEL_SIZE * sizeof(glm::vec4), NULL)) {
-        return false;
-    }
-    
-    for (int i = 0; i < Render_Backend::MAX_FRAMES_IN_FLIGHT; i++) {
-        for (int j = 0; j < MAX_RESOLVE_PASSES; j++) {
-            backend->update_descriptor_set(fullscreen_quad_descriptor_sets[i * Render_Backend::MAX_FRAMES_IN_FLIGHT + j], 0, &ssao_kernel_uniform_buffer);
-        }
-    }
     
     Immediate_Vertex fullscreen_quad_vertices[] = {
         { { -1.0f, -1.0f }, { 1.0f, 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f } },
@@ -943,21 +817,13 @@ bool Scene_Renderer::create_pipelines() {
     mesh_pipeline_info.depth_test_mode = DEPTH_TEST_MODE_LEQUAL;
     mesh_pipeline_info.depth_write     = true;
     mesh_pipeline_info.color_write     = true;
-    VkFormat main_pass_color_attachment_formats[2] = {
-        VK_FORMAT_R16G16B16A16_SFLOAT,
+    VkFormat main_pass_color_attachment_formats[1] = {
         VK_FORMAT_R16G16B16A16_SFLOAT,
     };
     mesh_pipeline_info.num_color_attachment_formats = 1;
     mesh_pipeline_info.color_attachment_formats = &main_pass_color_attachment_formats[0];
     mesh_pipeline_info.depth_attachment_format = VK_FORMAT_D32_SFLOAT;//depth_buffer.format;
     if (!backend->create_graphics_pipeline(mesh_pipeline_info, &mesh_pipeline)) {
-        return false;
-    }
-
-    mesh_pipeline_info.num_color_attachment_formats = ArrayCount(main_pass_color_attachment_formats);
-    mesh_pipeline_info.color_attachment_formats = main_pass_color_attachment_formats;
-    mesh_pipeline_info.shader_filename = "z_prepass";
-    if (!backend->create_graphics_pipeline(mesh_pipeline_info, &z_prepass_pipeline)) {
         return false;
     }
 
@@ -1004,19 +870,6 @@ bool Scene_Renderer::create_pipelines() {
     VkFormat resolve_pass_format = backend->get_swap_chain_surface_format();
     resolve_pipeline_info.color_attachment_formats = &resolve_pass_format;
     if (!backend->create_graphics_pipeline(resolve_pipeline_info, &resolve_pipeline)) {
-        return false;
-    }
-
-    VkFormat ssao_format = VK_FORMAT_R16_SFLOAT;
-    resolve_pipeline_info.shader_filename          = "ssao";
-    resolve_pipeline_info.color_attachment_formats = &ssao_format;
-    resolve_pipeline_info.blend_mode               = BLEND_MODE_OFF;
-    if (!backend->create_graphics_pipeline(resolve_pipeline_info, &ssao_pipeline)) {
-        return false;
-    }
-
-    resolve_pipeline_info.shader_filename = "ssao_blur";
-    if (!backend->create_graphics_pipeline(resolve_pipeline_info, &ssao_blur_pipeline)) {
         return false;
     }
 

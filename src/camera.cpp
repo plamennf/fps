@@ -168,3 +168,56 @@ void fixed_update_camera(Camera *camera, Camera_Type type, float dt, Terrain_Chu
 glm::mat4 get_view_matrix(Camera *camera) {
     return glm::lookAt(camera->position, camera->position + camera->target, camera->up);
 }
+
+glm::mat4 get_projection_matrix(Camera *camera, float aspect_ratio) {
+    return glm::perspective(glm::radians(camera->fov), aspect_ratio, camera->z_near, camera->z_far);
+}
+
+Frustum get_camera_frustum(glm::mat4 vp) {
+    Frustum result;
+
+    // Left plane
+    result.planes[0].normal.x = vp[0][3] + vp[0][0];
+    result.planes[0].normal.y = vp[1][3] + vp[1][0];
+    result.planes[0].normal.z = vp[2][3] + vp[2][0];
+    result.planes[0].d        = vp[3][3] + vp[3][0];
+
+    // Right plane
+    result.planes[1].normal.x = vp[0][3] - vp[0][0];
+    result.planes[1].normal.y = vp[1][3] - vp[1][0];
+    result.planes[1].normal.z = vp[2][3] - vp[2][0];
+    result.planes[1].d        = vp[3][3] - vp[3][0];
+
+    // Bottom plane
+    result.planes[2].normal.x = vp[0][3] + vp[0][1];
+    result.planes[2].normal.y = vp[1][3] + vp[1][1];
+    result.planes[2].normal.z = vp[2][3] + vp[2][1];
+    result.planes[2].d        = vp[3][3] + vp[3][1];
+
+    // Top plane
+    result.planes[3].normal.x = vp[0][3] - vp[0][1];
+    result.planes[3].normal.y = vp[1][3] - vp[1][1];
+    result.planes[3].normal.z = vp[2][3] - vp[2][1];
+    result.planes[3].d        = vp[3][3] - vp[3][1];
+
+    // Near plane
+    result.planes[4].normal.x = vp[0][3] + vp[0][2];
+    result.planes[4].normal.y = vp[1][3] + vp[1][2];
+    result.planes[4].normal.z = vp[2][3] + vp[2][2];
+    result.planes[4].d        = vp[3][3] + vp[3][2];
+
+    // Far plane
+    result.planes[5].normal.x = vp[0][3] - vp[0][2];
+    result.planes[5].normal.y = vp[1][3] - vp[1][2];
+    result.planes[5].normal.z = vp[2][3] - vp[2][2];
+    result.planes[5].d        = vp[3][3] - vp[3][2];
+
+    for (int i = 0; i < 6; i++) {
+        float len = glm::length(result.planes[i].normal);
+        float inv_len = len > 0.0f ? 1.0f / len : 1.0f;
+        result.planes[i].normal *= inv_len;
+        result.planes[i].d      *= inv_len;
+    }
+
+    return result;
+}

@@ -6,3 +6,4 @@ build-int/
 *.vcxproj.user
 *.slnx
 log.txt
+data/shaders/compiled/*.spv

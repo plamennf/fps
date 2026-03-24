@@ -17,10 +17,9 @@ struct Render_Entity {
 
 struct Scene_Renderer {
     static const int MAX_COLOR_TARGETS   = 4;
-    static const int MAX_RESOLVE_PASSES  = 3;
+    static const int MAX_RESOLVE_PASSES  = 1;
     static const int MAX_RENDER_PASSES   = MAX_SHADOW_CASCADES + 1;
     static const int MAX_RENDER_ENTITIES = 1024;
-    static const int SSAO_KERNEL_SIZE    = 192;
     
     bool init(Render_Backend *backend, Renderer_2D *renderer_2d);
 
@@ -62,14 +61,8 @@ private:
     Renderer_2D *renderer_2d = NULL;
     
     Texture offscreen_buffer;
-    Texture position_buffer;
-    Texture normal_buffer;
     Texture depth_buffer;
-    Texture ssao_buffer;
-    Texture ssao_blur_buffer;
     Texture shadow_map_buffers[MAX_SHADOW_CASCADES];
-
-    Texture ssao_noise_texture;
     
     float shadow_cascade_splits[MAX_SHADOW_CASCADES] = { 64.0f, 131.0f, 221.0f, 508.0f };
     
@@ -78,6 +71,7 @@ private:
     Light lights[MAX_LIGHTS] = {};
     int num_lights = 0;
     Camera camera;
+    Frustum camera_frustum;
     
     VkDescriptorPool per_scene_uniforms_descriptor_pool;
     VkDescriptorSetLayout per_scene_uniforms_descriptor_set_layout;
@@ -90,7 +84,6 @@ private:
     VkPipelineLayout mesh_pipeline_layout;
     VkPipelineLayout mesh_instanced_pipeline_layout;
     VkPipeline mesh_pipeline;
-    VkPipeline z_prepass_pipeline;
     VkPipeline mesh_instanced_pipeline;
     VkPipeline shadow_pipeline;
     VkPipeline shadow_instanced_pipeline;
@@ -98,17 +91,13 @@ private:
     VkDescriptorPool fullscreen_quad_descriptor_pool;
     VkDescriptorSetLayout fullscreen_quad_descriptor_set_layout;
     VkDescriptorSet fullscreen_quad_descriptor_sets[MAX_RESOLVE_PASSES * Render_Backend::MAX_FRAMES_IN_FLIGHT];
-    Gpu_Buffer ssao_kernel_uniform_buffer;
     VkPipelineLayout fullscreen_quad_pipeline_layout;
     Gpu_Buffer fullscreen_quad_vertex_buffer;
     Gpu_Buffer fullscreen_quad_index_buffer;
     VkPipeline resolve_pipeline;
-    VkPipeline ssao_pipeline;
-    VkPipeline ssao_blur_pipeline;
     
     // Per-frame data:
     enum Render_Stage {
-        RENDER_STAGE_Z_PREPASS,
         RENDER_STAGE_SHADOWS,
         RENDER_STAGE_MAIN,
     };

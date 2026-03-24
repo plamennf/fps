@@ -16,8 +16,9 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(VkDebugUtilsMessageSever
     return VK_FALSE;
 }
 
-bool Render_Backend::init(SDL_Window *_window) {
+bool Render_Backend::init(SDL_Window *_window, bool vsync) {
     window = _window;
+    should_vsync = vsync;
 
 #ifdef BUILD_DEBUG
     validation_layers_enabled = true;
@@ -75,7 +76,7 @@ bool Render_Backend::init(SDL_Window *_window) {
     logprintf("Present Queue Family Index: %d\n", queue_family_indices.present_family);
     
     if (!init_vma()) return false;
-    if (!create_swap_chain()) return false;
+    if (!create_swap_chain(vsync)) return false;
     if (!create_image_views()) return false;
     if (!create_command_pool()) return false;
     if (!create_command_buffer()) return false;
@@ -333,11 +334,17 @@ VkSurfaceFormatKHR Render_Backend::choose_swap_surface_format(int num_available_
     return available_formats[0];
 }
 
-VkPresentModeKHR Render_Backend::choose_swap_present_mode(int num_available_present_modes, VkPresentModeKHR *available_present_modes) {
+VkPresentModeKHR Render_Backend::choose_swap_present_mode(int num_available_present_modes, VkPresentModeKHR *available_present_modes, bool vsync) {
     for (int i = 0; i < num_available_present_modes; i++) {
         VkPresentModeKHR available_present_mode = available_present_modes[i];
-        if (available_present_mode == VK_PRESENT_MODE_MAILBOX_KHR) {
-            return available_present_mode;
+        if (vsync) {
+            if (available_present_mode == VK_PRESENT_MODE_MAILBOX_KHR) {
+                return available_present_mode;
+            }
+        } else {
+            if (available_present_mode == VK_PRESENT_MODE_IMMEDIATE_KHR) {
+                return available_present_mode;
+            }
         }
     }
 
@@ -511,11 +518,11 @@ bool Render_Backend::init_vma() {
     return true;
 }
 
-bool Render_Backend::create_swap_chain() {
+bool Render_Backend::create_swap_chain(bool vsync) {
     swap_chain_support_details = query_swap_chain_support(physical_device);
 
     swap_chain_surface_format = choose_swap_surface_format(swap_chain_support_details.num_formats, swap_chain_support_details.formats);
-    swap_chain_present_mode = choose_swap_present_mode(swap_chain_support_details.num_present_modes, swap_chain_support_details.present_modes);
+    swap_chain_present_mode = choose_swap_present_mode(swap_chain_support_details.num_present_modes, swap_chain_support_details.present_modes, vsync);
     swap_chain_extent = choose_swap_extent(window, swap_chain_support_details.capabilities);
 
     u32 num_images = swap_chain_support_details.capabilities.minImageCount + 1;
@@ -964,7 +971,7 @@ bool Render_Backend::create_command_buffer() {
     alloc_info.sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     alloc_info.commandPool        = command_pool;
     alloc_info.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    alloc_info.commandBufferCount = 2;
+    alloc_info.commandBufferCount = MAX_FRAMES_IN_FLIGHT;
     if (vkAllocateCommandBuffers(device, &alloc_info, command_buffers) != VK_SUCCESS) {
         logprintf("Failed to allocate command buffers!\n");
         return false;
@@ -1034,7 +1041,7 @@ bool Render_Backend::recreate_swap_chain() {
 
     destroy_swap_chain();
 
-    if (!create_swap_chain())  return false;
+    if (!create_swap_chain(should_vsync))  return false;
     if (!create_image_views()) return false;
     
     return true;

@@ -2,7 +2,7 @@
 //#define DISABLE_SHADOW_BLEND
 
 #define SHADOW_MAP_WIDTH  4096
-#define SHADOW_MAP_HEIGHT 4096
+#define SHADOW_MAP_HEIGHT SHADOW_MAP_WIDTH
 
 #define PI 3.14159265359
 
@@ -84,7 +84,6 @@ layout(set = 0, binding = 1) uniform sampler2D shadow_map_0;
 layout(set = 0, binding = 2) uniform sampler2D shadow_map_1;
 layout(set = 0, binding = 3) uniform sampler2D shadow_map_2;
 layout(set = 0, binding = 4) uniform sampler2D shadow_map_3;
-layout(set = 0, binding = 5) uniform sampler2D ssao_blur_texture;
 
 struct Cascade_Data {
     int index0;
@@ -158,13 +157,13 @@ float pcf_shadow(vec3 proj_coords, int cascade_index, float bias) {
                 } break;
 
                 case 2: {
-                    vec2 offset = vec2(x, y) / vec2(SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT);
+                    vec2 offset = vec2(x, y) / vec2(SHADOW_MAP_WIDTH / 2, SHADOW_MAP_HEIGHT / 2);
                     float shadow_depth = texture(shadow_map_2, proj_coords.xy + offset).r;
                     s = current_depth - bias > shadow_depth ? 0.0 : 1.0;
                 } break;
 
                 case 3: {
-                    vec2 offset = vec2(x, y) / vec2(SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT);
+                    vec2 offset = vec2(x, y) / vec2(SHADOW_MAP_WIDTH / 4, SHADOW_MAP_HEIGHT / 4);
                     float shadow_depth = texture(shadow_map_3, proj_coords.xy + offset).r;
                     s = current_depth - bias > shadow_depth ? 0.0 : 1.0;
                 } break;
@@ -339,13 +338,7 @@ vec3 calculate_lighting(vec2 frag_uv, vec4 frag_color, vec3 world_normal, mat3 T
         Lo += ((kD * albedo / PI + specular) * radiance * NdotL) * s;
     }
 
-#ifdef USE_INSTANCING
-    float ssao   = 1.0;
-#else
-    //float ssao   = texture(ssao_blur_texture, vec2(frag_uv.x, 1.0 - frag_uv.y)).r;
-    float ssao   = texture(ssao_blur_texture, frag_uv).r;
-#endif
-    vec3 ambient = ssao * albedo * ao * 0.03;
+    vec3 ambient = albedo * ao * 0.03;
     vec3 color   = ambient + Lo + emissive;
 
     //const float density  = 0.007;

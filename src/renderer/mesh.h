@@ -52,6 +52,8 @@ struct Mesh {
     
     int num_submeshes;
     Submesh *submeshes;
+
+    float bounds_radius = 0.0f;
 };
 
 bool load_mesh(Mesh *mesh, char *filepath);

@@ -424,6 +424,20 @@ bool load_mesh(Mesh *mesh, char *filepath) {
     } else if (strings_match(extension, "mesh")) {
         return load_mesh_custom(mesh, filepath);
     }
+
+    float max_distance_squared = 0.0f;
+    for (int i = 0; i < mesh->num_submeshes; i++) {
+        Submesh *submesh = &mesh->submeshes[i];
+        for (int j = 0; j < submesh->num_vertices; j++) {
+            Mesh_Vertex const &vertex = submesh->vertices[j];
+            float distance_squared = glm::length2(vertex.position);
+            if (distance_squared > max_distance_squared) {
+                max_distance_squared = distance_squared;
+            }
+        }
+    }
+
+    mesh->bounds_radius = sqrtf(max_distance_squared);
     
     return false;
 }

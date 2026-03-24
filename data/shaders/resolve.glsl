@@ -22,7 +22,7 @@ void main() {
 
 layout(location = 0) out vec4 output_color;
 
-layout(set = 1, binding = 1) uniform sampler2D hdr_texture;
+layout(set = 1, binding = 0) uniform sampler2D hdr_texture;
 
 vec3 aces(vec3 x) {
     float a = 2.51;
