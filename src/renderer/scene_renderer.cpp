@@ -211,7 +211,7 @@ void Scene_Renderer::generate_gpu_data_for_submesh(Submesh *submesh) {
     if (submesh->material.albedo_texture_name) {
         submesh->material.albedo_texture = globals.texture_registry->find_or_load(submesh->material.albedo_texture_name);
     }
-
+    
     submesh->material.normal_texture = globals.white_texture;
     if (submesh->material.normal_texture_name) {
         submesh->material.normal_texture = globals.texture_registry->find_or_load(submesh->material.normal_texture_name);
@@ -241,15 +241,17 @@ void Scene_Renderer::generate_gpu_data_for_submesh(Submesh *submesh) {
     
     if (!backend->create_buffer(&submesh->material.uniform_buffer, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, sizeof(Material_Uniforms), &material_uniforms)) return;
     
-    if (!backend->create_descriptor_sets(material_uniforms_descriptor_pool, material_uniforms_descriptor_set_layout, 1, &submesh->material.descriptor_set)) return;
-    
-    backend->update_descriptor_set(submesh->material.descriptor_set, 0, &submesh->material.uniform_buffer);
-    backend->update_descriptor_set(submesh->material.descriptor_set, 1, submesh->material.albedo_texture);
-    backend->update_descriptor_set(submesh->material.descriptor_set, 2, submesh->material.normal_texture);
-    backend->update_descriptor_set(submesh->material.descriptor_set, 3, submesh->material.metallic_roughness_texture);
-    backend->update_descriptor_set(submesh->material.descriptor_set, 4, submesh->material.ao_texture);
-    backend->update_descriptor_set(submesh->material.descriptor_set, 5, submesh->material.emissive_texture);
+    if (!backend->create_descriptor_sets(material_uniforms_descriptor_pool, material_uniforms_descriptor_set_layout, Render_Backend::MAX_FRAMES_IN_FLIGHT, submesh->material.descriptor_sets)) return;
 
+    for (int i = 0; i < Render_Backend::MAX_FRAMES_IN_FLIGHT; i++) {
+        VkDescriptorSet descriptor_set = submesh->material.descriptor_sets[i];
+        backend->update_descriptor_set(descriptor_set, 0, &submesh->material.uniform_buffer);
+        backend->update_descriptor_set(descriptor_set, 1, submesh->material.albedo_texture);
+        backend->update_descriptor_set(descriptor_set, 2, submesh->material.normal_texture);
+        backend->update_descriptor_set(descriptor_set, 3, submesh->material.metallic_roughness_texture);
+        backend->update_descriptor_set(descriptor_set, 4, submesh->material.ao_texture);
+        backend->update_descriptor_set(descriptor_set, 5, submesh->material.emissive_texture);
+    }
     submesh->has_gpu_data = true;
 }
 
@@ -272,7 +274,7 @@ void Scene_Renderer::render_all_entities(VkCommandBuffer cb, int cascade_index) 
                 } break;
 
                 case RENDER_STAGE_MAIN: {
-                    pipeline_for_current_pass = mesh_pipeline;
+                    pipeline_for_current_pass = terrain_pipeline;
                 } break;
             }
 
@@ -283,7 +285,7 @@ void Scene_Renderer::render_all_entities(VkCommandBuffer cb, int cascade_index) 
             
             glm::vec3 world_position = chunk.offset;
             glm::mat4 world_matrix = glm::translate(glm::mat4(1.0f), world_position);
-            draw_mesh(cb, (Mesh *)&chunk.mesh, world_matrix, glm::vec4(0, 1, 0, 1), cascade_index);
+            draw_mesh(cb, (Mesh *)&chunk.mesh, world_matrix, glm::vec4(0, 1, 0, 1), cascade_index, &chunk);
         }
 
         int instance_buffer_index = MAX_RENDER_PASSES * backend->current_frame;
@@ -298,7 +300,7 @@ void Scene_Renderer::render_all_entities(VkCommandBuffer cb, int cascade_index) 
                 instance_buffer_index += MAX_SHADOW_CASCADES;
             } break;
         }
-    
+        
         pipeline_layout_for_current_pass = mesh_instanced_pipeline_layout;
 
         vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_for_current_pass);
@@ -596,7 +598,7 @@ void Scene_Renderer::draw_hud(VkExtent2D extent) {
     renderer_2d->draw_text(font, text, x, y, color);
 }
 
-void Scene_Renderer::draw_mesh(VkCommandBuffer cb, Mesh *mesh, glm::mat4 const &world_matrix, glm::vec4 scale_color, int cascade_index) {
+void Scene_Renderer::draw_mesh(VkCommandBuffer cb, Mesh *mesh, glm::mat4 const &world_matrix, glm::vec4 scale_color, int cascade_index, Terrain_Chunk *chunk) {
     Per_Object_Uniforms per_object_uniforms = {};
 
     per_object_uniforms.world_matrix         = world_matrix;
@@ -614,8 +616,10 @@ void Scene_Renderer::draw_mesh(VkCommandBuffer cb, Mesh *mesh, glm::mat4 const &
         }
 
         MyZoneScopedN("Draw one submesh");
+
+        backend->update_descriptor_set(submesh->material.descriptor_sets[backend->current_frame], 6, chunk ? &chunk->ao_map : globals.white_texture);
         
-        vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_for_current_pass, 1, 1, &submesh->material.descriptor_set, 0, NULL);
+        vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_for_current_pass, 1, 1, &submesh->material.descriptor_sets[backend->current_frame], 0, NULL);
 
         VkDeviceSize offset = 0;
         vkCmdBindVertexBuffers(cb, 0, 1, &submesh->vertex_buffer.buffer, &offset);
@@ -625,7 +629,7 @@ void Scene_Renderer::draw_mesh(VkCommandBuffer cb, Mesh *mesh, glm::mat4 const &
     }
 }
 
-void Scene_Renderer::draw_mesh_instanced(VkCommandBuffer cb, Mesh *mesh, Gpu_Buffer *instance_buffer, int offset, int count) {
+void Scene_Renderer::draw_mesh_instanced(VkCommandBuffer cb, Mesh *mesh, Gpu_Buffer *instance_buffer, int offset, int count, Terrain_Chunk *chunk) {
     for (int i = 0; i < mesh->num_submeshes; i++) {
         Submesh *submesh = &mesh->submeshes[i];
         if (!submesh->has_gpu_data) {
@@ -635,8 +639,10 @@ void Scene_Renderer::draw_mesh_instanced(VkCommandBuffer cb, Mesh *mesh, Gpu_Buf
 
         MyZoneScopedN("Draw one submesh instanced");
 
+        backend->update_descriptor_set(submesh->material.descriptor_sets[backend->current_frame], 6, chunk ? &chunk->heightmap : globals.white_texture);
+        
         Assert(pipeline_layout_for_current_pass == mesh_instanced_pipeline_layout);
-        vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_for_current_pass, 1, 1, &submesh->material.descriptor_set, 0, NULL);
+        vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_for_current_pass, 1, 1, &submesh->material.descriptor_sets[backend->current_frame], 0, NULL);
 
         VkBuffer vertex_buffers[] = { submesh->vertex_buffer.buffer, instance_buffer->buffer };
         //VkDeviceSize offsets[] = { 0, (VkDeviceSize)offset };
@@ -716,20 +722,20 @@ bool Scene_Renderer::create_material_vulkan_objects() {
     material_uniforms_pool_sizes[0].descriptorCount = MAX_RENDER_ENTITIES * max_submeshes_per_render_entity;
 
     material_uniforms_pool_sizes[1].type            = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    material_uniforms_pool_sizes[1].descriptorCount = MAX_RENDER_ENTITIES * max_submeshes_per_render_entity * 5; // TODO: Remove this magic number make it a texture type enum for example
+    material_uniforms_pool_sizes[1].descriptorCount = MAX_RENDER_ENTITIES * max_submeshes_per_render_entity * 6; // TODO: Remove this magic number make it a texture type enum for example
 
     if (!backend->create_descriptor_pool(&material_uniforms_descriptor_pool, ArrayCount(material_uniforms_pool_sizes), material_uniforms_pool_sizes, MAX_RENDER_ENTITIES * max_submeshes_per_render_entity)) {
         return false;
     }
 
-    VkDescriptorSetLayoutBinding material_uniforms_descriptor_set_layout_bindings[6] = {};
+    VkDescriptorSetLayoutBinding material_uniforms_descriptor_set_layout_bindings[7] = {};
 
     material_uniforms_descriptor_set_layout_bindings[0].binding = 0;
     material_uniforms_descriptor_set_layout_bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     material_uniforms_descriptor_set_layout_bindings[0].descriptorCount = 1;
     material_uniforms_descriptor_set_layout_bindings[0].stageFlags      = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
-    for (int i = 1; i < 6; i++) {
+    for (int i = 1; i < 7; i++) {
         material_uniforms_descriptor_set_layout_bindings[i].binding = i;
         material_uniforms_descriptor_set_layout_bindings[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         material_uniforms_descriptor_set_layout_bindings[i].descriptorCount = 1;
@@ -827,6 +833,11 @@ bool Scene_Renderer::create_pipelines() {
         return false;
     }
 
+    mesh_pipeline_info.shader_filename = "terrain";
+    if (!backend->create_graphics_pipeline(mesh_pipeline_info, &terrain_pipeline)) {
+        return false;
+    }
+    
     mesh_pipeline_info.pipeline_layout = mesh_instanced_pipeline_layout;
     mesh_pipeline_info.shader_filename = "basic_instanced";
     mesh_pipeline_info.vertex_type     = RENDER_VERTEX_MESH_INSTANCED;

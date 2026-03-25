@@ -28,7 +28,7 @@ struct Material {
     Texture *emissive_texture = NULL;
     glm::vec3 emissive_factor = glm::vec3(0, 0, 0);
 
-    VkDescriptorSet descriptor_set;
+    VkDescriptorSet descriptor_sets[Render_Backend::MAX_FRAMES_IN_FLIGHT];
     Gpu_Buffer uniform_buffer;
 };
 

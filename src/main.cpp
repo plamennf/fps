@@ -188,13 +188,15 @@ int main(int argc, char *argv[]) {
     SDL_SetRelativeMouseMode(SDL_TRUE);
 
     if (start_fullscreen) {
-        toggle_fullscreen(globals.window);
+        //toggle_fullscreen(globals.window);
     }
 
     Terrain_Chunk chunk;
     //chunk.generate(3489451201, 1.0f, glm::vec3(0.0f), 100000);
     //chunk.generate(69420, 512, 1.0f, glm::vec3(0.0f), 10000);
     chunk.generate(69420, 512, 1.0f, glm::vec3(0.0f), 1000);
+
+    //return 0;
     
     float accumulated_dt = 0.0f;
     float fixed_update_dt = 1.0f / 60.0f;

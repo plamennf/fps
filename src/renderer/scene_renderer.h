@@ -46,8 +46,8 @@ private:
     void draw_imgui_stuff();
     void draw_hud(VkExtent2D extent);
 
-    void draw_mesh(VkCommandBuffer cb, Mesh *mesh, glm::mat4 const &world_matrix, glm::vec4 scale_color, int cascade_index = -1);
-    void draw_mesh_instanced(VkCommandBuffer cb, Mesh *mesh, Gpu_Buffer *instance_buffer, int offset, int count);
+    void draw_mesh(VkCommandBuffer cb, Mesh *mesh, glm::mat4 const &world_matrix, glm::vec4 scale_color, int cascade_index = -1, Terrain_Chunk *chunk = NULL);
+    void draw_mesh_instanced(VkCommandBuffer cb, Mesh *mesh, Gpu_Buffer *instance_buffer, int offset, int count, Terrain_Chunk *chunk = NULL);
     void draw_fullscreen_quad(VkCommandBuffer cb, VkPipeline pipeline, VkDescriptorSet descriptor_set);
     
     bool create_per_scene_vulkan_objects();
@@ -84,6 +84,7 @@ private:
     VkPipelineLayout mesh_pipeline_layout;
     VkPipelineLayout mesh_instanced_pipeline_layout;
     VkPipeline mesh_pipeline;
+    VkPipeline terrain_pipeline;
     VkPipeline mesh_instanced_pipeline;
     VkPipeline shadow_pipeline;
     VkPipeline shadow_instanced_pipeline;

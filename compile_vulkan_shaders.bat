@@ -5,6 +5,9 @@ if not exist data\shaders\compiled mkdir data\shaders\compiled
 glslangValidator -Idata\shaders -V -S vert -DVERTEX_SHADER -DCOMM=out -o data\shaders\compiled\basic.vert.spv data\shaders\basic.glsl
 glslangValidator -Idata\shaders -V -S frag -DFRAGMENT_SHADER -DCOMM=in -o data\shaders\compiled\basic.frag.spv data\shaders\basic.glsl
 
+glslangValidator -Idata\shaders -V -S vert -DVERTEX_SHADER -DCOMM=out -o data\shaders\compiled\terrain.vert.spv data\shaders\terrain.glsl
+glslangValidator -Idata\shaders -V -S frag -DFRAGMENT_SHADER -DCOMM=in -o data\shaders\compiled\terrain.frag.spv data\shaders\terrain.glsl
+
 glslangValidator -Idata\shaders -V -S vert -DVERTEX_SHADER -DCOMM=out -o data\shaders\compiled\basic_instanced.vert.spv data\shaders\basic_instanced.glsl
 glslangValidator -Idata\shaders -V -S frag -DFRAGMENT_SHADER -DCOMM=in -o data\shaders\compiled\basic_instanced.frag.spv data\shaders\basic_instanced.glsl
 

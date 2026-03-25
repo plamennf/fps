@@ -46,6 +46,9 @@ struct Terrain_Chunk {
         int count;
     };
 
+    Texture heightmap;
+    Texture ao_map;
+    
     eastl::vector <Terrain_Object_Instance_Batch> batches;
     
     bool generate(u32 seed, int num_vertices_per_side, float scale, glm::vec3 offset, int num_objects_to_place);

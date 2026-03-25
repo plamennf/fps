@@ -3,6 +3,9 @@
 #include "renderer/mesh_registry.h"
 #include "main.h"
 
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <stb_image_write.h>
+
 static int num_variations_per_terrain_object_type[NUM_TERRAIN_OBJECT_TYPES] = {
     5, // TERRAIN_OBJECT_TREE
     3, // TERRAIN_OBJECT_ROCK
@@ -152,12 +155,14 @@ bool Terrain_Chunk::generate(u32 _seed, int _num_vertices_per_side, float _scale
     
     eastl::vector <Mesh_Vertex> vertices;
     eastl::vector <u32> indices;
+    eastl::vector <float> heightmap_data;
     
     //
     // Generate vertices
     //
     {
         vertices.resize(num_vertices_per_side * num_vertices_per_side);
+        heightmap_data.resize(num_vertices_per_side * num_vertices_per_side);
         for (int z = 0; z < num_vertices_per_side; z++) {
             for (int x = 0; x < num_vertices_per_side; x++) {
                 int index = z * num_vertices_per_side + x;
@@ -165,12 +170,13 @@ bool Terrain_Chunk::generate(u32 _seed, int _num_vertices_per_side, float _scale
                 float world_x = x * scale + offset.x;
                 float world_z = z * scale + offset.z;
 
-                float height  = get_height(world_x, world_z);
+                float height          = get_height(world_x, world_z);
+                heightmap_data[index] = height;
 
                 Mesh_Vertex v = {};
 
                 v.position = glm::vec3(world_x, height, world_z);
-                v.uv       = glm::vec2((float)x / num_vertices_per_side, (float)z / num_vertices_per_side);
+                v.uv       = glm::vec2((float)x / (num_vertices_per_side - 1), (float)z / (num_vertices_per_side - 1));
                 v.color    = glm::vec4(1, 1, 1, 1);
 
                 vertices[index] = v;
@@ -373,6 +379,96 @@ bool Terrain_Chunk::generate(u32 _seed, int _num_vertices_per_side, float _scale
             objects_instance_data[i].world_matrix         = world_matrix;
             objects_instance_data[i].scale_color          = glm::vec4(1);
         }
+    }
+
+    if (!globals.render_backend->create_texture(&heightmap, num_vertices_per_side, num_vertices_per_side, VK_FORMAT_R16_SFLOAT, heightmap_data.data(), "heightmap")) {
+        return false;
+    }
+
+    eastl::vector <float> ao_map_data;
+    ao_map_data.resize(num_vertices_per_side * num_vertices_per_side);
+
+    int radius      = 8;
+    int num_bounces = 8;
+    for (int z = 0; z < num_vertices_per_side; z++) {
+        for (int x = 0; x < num_vertices_per_side; x++) {
+            float current_height = heightmap_data[z * num_vertices_per_side + x];
+
+            float occlusion = 0.0f;
+            for (int i = 0; i < num_bounces; i++) {
+                float angle = (float)i / num_bounces * glm::two_pi<float>();
+                float dx    = glm::cos(angle);
+                float dz    = glm::sin(angle);
+
+                float max_slope = -FLT_MAX;
+                for (int step = 1; step <= radius; step++) {
+                    int sx = x + (int)(dx * step);
+                    int sz = z + (int)(dz * step);
+
+                    sx = glm::clamp(sx, 0, num_vertices_per_side - 1);
+                    sz = glm::clamp(sz, 0, num_vertices_per_side - 1);
+
+                    float h    = heightmap_data[sz * num_vertices_per_side + sx];
+                    float dist = step * scale;
+
+                    float slope = (h - current_height) / dist;
+                    slope = glm::clamp(slope, -1.0f, 1.0f);
+                    
+                    max_slope   = Max(max_slope, slope);
+                }
+                
+                occlusion += Max(max_slope, 0.0f);
+            }
+
+            occlusion /= num_bounces;
+
+            float ao = 1.0f - occlusion;//glm::clamp(occlusion + 2.0f, 0.0f, 1.0f);
+            ao = glm::clamp(ao, 0.0f, 1.0f);
+            ao_map_data[z * num_vertices_per_side + x] = ao;
+        }
+    }
+
+    float min_ao = 1.0f;
+    float max_ao = 0.0f;
+
+    for (float v : ao_map_data) {
+        min_ao = glm::min(min_ao, v);
+        max_ao = glm::max(max_ao, v);
+    }
+
+    logprintf("AO range: %f -> %f\n", min_ao, max_ao);
+    
+    eastl::vector <float> ao_map_data_blurred;
+    ao_map_data_blurred.resize(num_vertices_per_side * num_vertices_per_side);
+
+    for (int z = 1; z < num_vertices_per_side - 1; z++) {
+        for (int x = 1; x < num_vertices_per_side - 1; x++) {
+            float sum = 0.0f;
+            int count = 0;
+
+            for (int dz = -1; dz <= 1; dz++) {
+                for (int dx = -1; dx <= 1; dx++) {
+                    sum += ao_map_data[(z + dz) * num_vertices_per_side + (x + dx)];
+                    count++;
+                }
+            }
+
+            ao_map_data_blurred[z * num_vertices_per_side + x] = sum / count;
+        }
+    }
+
+    eastl::vector <u8> ao_map_data_int;
+    ao_map_data_int.resize(num_vertices_per_side * num_vertices_per_side);
+    for (int i = 0; i < ao_map_data.size(); i++) {
+        float ao = glm::clamp(ao_map_data[i], 0.0f, 1.0f);
+        ao = glm::pow(ao, 1.5f);
+        ao_map_data_int[i] = (u8)(ao * 255.0f);
+    }
+
+    stbi_write_bmp("terrain_ao.bmp", num_vertices_per_side, num_vertices_per_side, 1, ao_map_data_int.data());
+
+    if (!globals.render_backend->create_texture(&ao_map, num_vertices_per_side, num_vertices_per_side, VK_FORMAT_R8_UNORM, ao_map_data.data(), "terrain_ao")) {
+        return false;
     }
     
     return true;

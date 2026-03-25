@@ -79,6 +79,7 @@ layout(set = 1, binding = 2) uniform sampler2D normal_texture;
 layout(set = 1, binding = 3) uniform sampler2D metallic_roughness_texture;
 layout(set = 1, binding = 4) uniform sampler2D ao_texture;
 layout(set = 1, binding = 5) uniform sampler2D emissive_texture;
+layout(set = 1, binding = 6) uniform sampler2D terrain_ao;
 
 layout(set = 0, binding = 1) uniform sampler2D shadow_map_0;
 layout(set = 0, binding = 2) uniform sampler2D shadow_map_1;
@@ -338,6 +339,9 @@ vec3 calculate_lighting(vec2 frag_uv, vec4 frag_color, vec3 world_normal, mat3 T
         Lo += ((kD * albedo / PI + specular) * radiance * NdotL) * s;
     }
 
+#ifdef DO_TERRAIN_AO
+    ao = texture(terrain_ao, frag_uv).r;
+#endif
     vec3 ambient = albedo * ao * 0.03;
     vec3 color   = ambient + Lo + emissive;
 
