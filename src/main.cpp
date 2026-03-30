@@ -188,7 +188,7 @@ int main(int argc, char *argv[]) {
     SDL_SetRelativeMouseMode(SDL_TRUE);
 
     if (start_fullscreen) {
-        //toggle_fullscreen(globals.window);
+        toggle_fullscreen(globals.window);
     }
 
     Terrain_Chunk chunk;

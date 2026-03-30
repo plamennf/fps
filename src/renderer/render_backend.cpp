@@ -1518,6 +1518,8 @@ bool Render_Backend::update_texture(Texture *texture, int x, int y, int width, i
     VkDeviceSize bpp;
     if (texture->format == VK_FORMAT_R16G16B16A16_SFLOAT) {
         bpp = 2 * sizeof(float);
+    } else if (texture->format == VK_FORMAT_R8_UNORM) {
+        bpp = 1;
     } else {
         bpp = 4;
     }
