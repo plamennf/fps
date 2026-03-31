@@ -41,7 +41,9 @@ struct Per_Scene_Uniforms {
     glm::vec4 cascade_splits[MAX_SHADOW_CASCADES];  // We are wasting memory right now because of hlsl alignment rules. If we end up with a MAX_SHADOW_CASCADES value which is a multiple of 4 we can fix this.
     Light lights[MAX_LIGHTS];
     glm::vec3 camera_position;
-    float _padding0;
+    int cubemap_face;
+    glm::vec2 extent;
+    float _padding0[2];
 };
 
 struct Per_Object_Uniforms {
@@ -75,10 +77,10 @@ struct Immediate_Vertex {
 };
 
 struct Queue_Family_Indices {
-    u32 graphics_family;
-    bool has_graphics_family;
-    u32 present_family;
-    bool has_present_family;
+    u32 graphics_family = 0;
+    bool has_graphics_family = false;
+    u32 present_family = 0;
+    bool has_present_family = false;
 };
 
 struct Swap_Chain_Support_Details {
@@ -101,10 +103,13 @@ struct Gpu_Buffer {
 struct Texture {
     int width = 0;
     int height = 0;
+
+    bool is_cubemap = false;
     
     VkImage image = VK_NULL_HANDLE;
     VmaAllocation allocation = {};
     VkImageView view = VK_NULL_HANDLE;
+    VkImageView cubemap_views[6] = {};
     VkSampler sampler = VK_NULL_HANDLE;
     VkFormat format = VK_FORMAT_UNDEFINED;
 };
@@ -197,6 +202,7 @@ struct Render_Backend {
     void image_layout_transition(VkCommandBuffer buffer, VkImage image, VkImageLayout old_layout, VkImageLayout new_layout, VkImageSubresourceRange subresource_range);
 
     bool create_framebuffer(Texture *texture, int width, int height, VkFormat format);
+    bool create_cubemap_framebuffer(Texture *texture, int width, int height, VkFormat format);
     void destroy_texture(Texture *texture);
     bool update_texture(Texture *texture, int x, int y, int width, int height, void *data);
     

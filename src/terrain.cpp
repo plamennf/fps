@@ -309,6 +309,7 @@ bool Terrain_Chunk::generate(u32 _seed, int _num_vertices_per_side, float _scale
 
         if (density > 0.7f) {
             type = TERRAIN_OBJECT_TREE;
+            position.y -= 1.0f;
         } else if (density > 0.55f) {
             type = TERRAIN_OBJECT_BUSH;
         } else if (density > 0.45f) {

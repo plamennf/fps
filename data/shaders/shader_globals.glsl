@@ -31,9 +31,8 @@ layout(set = 0, binding = 0) uniform Per_Scene {
     vec4 cascade_splits[MAX_SHADOW_CASCADES];
     Light lights[MAX_LIGHTS];
     vec3 camera_position;
-    float ssao_radius;
-    vec2 ssao_noise_scale;
-    float ssao_bias;
+    int cubemap_face;
+    vec2 extent;
 } per_scene;
 
 layout(set = 1, binding = 0) uniform Material {
@@ -85,6 +84,7 @@ layout(set = 0, binding = 1) uniform sampler2D shadow_map_0;
 layout(set = 0, binding = 2) uniform sampler2D shadow_map_1;
 layout(set = 0, binding = 3) uniform sampler2D shadow_map_2;
 layout(set = 0, binding = 4) uniform sampler2D shadow_map_3;
+layout(set = 0, binding = 5) uniform samplerCube skybox_texture;
 
 struct Cascade_Data {
     int index0;

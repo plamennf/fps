@@ -22,3 +22,9 @@ glslangValidator -Idata\shaders -V -S frag -DFRAGMENT_SHADER -DCOMM=in -o data\s
 
 glslangValidator -Idata\shaders -V -S vert -DVERTEX_SHADER -DCOMM=out -o data\shaders\compiled\resolve.vert.spv data\shaders\resolve.glsl
 glslangValidator -Idata\shaders -V -S frag -DFRAGMENT_SHADER -DCOMM=in -o data\shaders\compiled\resolve.frag.spv data\shaders\resolve.glsl
+
+glslangValidator -Idata\shaders -V -S vert -DVERTEX_SHADER -DCOMM=out -o data\shaders\compiled\atmosphere.vert.spv data\shaders\atmosphere.glsl
+glslangValidator -Idata\shaders -V -S frag -DFRAGMENT_SHADER -DCOMM=in -o data\shaders\compiled\atmosphere.frag.spv data\shaders\atmosphere.glsl
+
+glslangValidator -Idata\shaders -V -S vert -DVERTEX_SHADER -DCOMM=out -o data\shaders\compiled\sky.vert.spv data\shaders\sky.glsl
+glslangValidator -Idata\shaders -V -S frag -DFRAGMENT_SHADER -DCOMM=in -o data\shaders\compiled\sky.frag.spv data\shaders\sky.glsl

@@ -20,7 +20,7 @@ bool Render_Backend::init(SDL_Window *_window, bool vsync) {
     window = _window;
     should_vsync = vsync;
 
-#ifdef BUILD_DEBUG
+#if defined(BUILD_DEBUG) || defined(BUILD_RELEASE)
     validation_layers_enabled = true;
 #else
     validation_layers_enabled = false;
@@ -465,6 +465,9 @@ bool Render_Backend::create_logical_device() {
     
     VkPhysicalDeviceFeatures device_features = {};
 
+    device_features.samplerAnisotropy = VK_TRUE;
+    device_features.shaderSampledImageArrayDynamicIndexing = VK_TRUE;
+    
     VkDeviceCreateInfo create_info = {};
     
     create_info.sType                = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -540,12 +543,15 @@ bool Render_Backend::create_swap_chain(bool vsync) {
     create_info.imageArrayLayers = 1;
     create_info.imageUsage       = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
+    Assert(queue_family_indices.has_graphics_family);
+    Assert(queue_family_indices.has_present_family);
+
+    u32 _queue_family_indices[] = {
+        queue_family_indices.graphics_family,
+        queue_family_indices.present_family,
+    };
+    
     if (queue_family_indices.graphics_family != queue_family_indices.present_family) {
-        u32 _queue_family_indices[] = {
-            queue_family_indices.graphics_family,
-            queue_family_indices.present_family,
-        };
-        
         create_info.imageSharingMode      = VK_SHARING_MODE_CONCURRENT;
         create_info.queueFamilyIndexCount = ArrayCount(_queue_family_indices);
         create_info.pQueueFamilyIndices   = _queue_family_indices;
@@ -1417,6 +1423,86 @@ bool Render_Backend::create_framebuffer(Texture *texture, int width, int height,
     }
     
     return true;
+}
+
+bool Render_Backend::create_cubemap_framebuffer(Texture *texture, int width, int height, VkFormat format) {
+    texture->format = format;
+    
+    VkImageCreateInfo image_info = {};
+    image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    image_info.imageType = VK_IMAGE_TYPE_2D;
+    image_info.extent.width  = width;
+    image_info.extent.height = height;
+    image_info.extent.depth  = 1;
+    image_info.mipLevels = 1;
+    image_info.arrayLayers = 6;
+    image_info.format = format;
+    image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    image_info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    image_info.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    image_info.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+
+    VmaAllocationCreateInfo alloc_info = {};
+    alloc_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+
+    vmaCreateImage(allocator, &image_info, &alloc_info, &texture->image, &texture->allocation, NULL);
+
+    VkImageViewCreateInfo view_info = {};
+    view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    view_info.image = texture->image;
+    view_info.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
+    view_info.format = format;
+
+    view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    view_info.subresourceRange.baseMipLevel = 0;
+    view_info.subresourceRange.levelCount = 1;
+    view_info.subresourceRange.baseArrayLayer = 0;
+    view_info.subresourceRange.layerCount = 6;
+
+    vkCreateImageView(device, &view_info, NULL, &texture->view);
+    
+    for (int i = 0; i < 6; i++) {
+        view_info.viewType                        = VK_IMAGE_VIEW_TYPE_2D;
+        view_info.subresourceRange.baseArrayLayer = i;
+        view_info.subresourceRange.layerCount     = 1;
+        vkCreateImageView(device, &view_info, nullptr, &texture->cubemap_views[i]);
+    }
+
+    texture->width      = width;
+    texture->height     = height;
+    texture->is_cubemap = true;
+
+    VkSamplerCreateInfo sampler_info = {};
+    sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    if (format != VK_FORMAT_R16_SFLOAT) {
+        sampler_info.minFilter = VK_FILTER_LINEAR;
+        sampler_info.magFilter = VK_FILTER_LINEAR;
+        sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        sampler_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        sampler_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    } else {
+        sampler_info.minFilter = VK_FILTER_NEAREST;
+        sampler_info.magFilter = VK_FILTER_NEAREST;
+        sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+        sampler_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        sampler_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    }
+    sampler_info.maxAnisotropy = 1;
+    sampler_info.compareEnable = VK_FALSE;
+    sampler_info.compareOp = VK_COMPARE_OP_ALWAYS;
+    sampler_info.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    sampler_info.anisotropyEnable = VK_TRUE;
+    
+    if (vkCreateSampler(device, &sampler_info, VK_NULL_HANDLE, &texture->sampler) != VK_SUCCESS) {
+        logprintf("Failed to create framebuffer texture sampler!\n");
+        return false;
+    }
+    
+    return true;    
 }
 
 bool Render_Backend::create_texture(Texture *texture, int width, int height, VkFormat format, void *data, char *filepath) {
