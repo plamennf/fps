@@ -65,8 +65,10 @@ bool Scene_Renderer::init_framebuffers() {
         return false;
     }
 
-    for (int j = 0; j < 7 * Render_Backend::MAX_FRAMES_IN_FLIGHT; j++) {
-        backend->update_descriptor_set(per_scene_uniforms_descriptor_sets[j], MAX_SHADOW_CASCADES + 1, &atmosphere_buffer);
+    for (int j = 0; j < Render_Backend::MAX_FRAMES_IN_FLIGHT; j++) {
+        for (int i = 0; i < MAX_RESOLVE_PASSES; i++) {
+            backend->update_descriptor_set(per_frame_data[j].per_scene_uniforms_descriptor_sets[i], MAX_SHADOW_CASCADES + 1, &atmosphere_buffer);
+        }
     }
     
     for (int i = 0; i < MAX_SHADOW_CASCADES; i++) {
@@ -84,8 +86,10 @@ bool Scene_Renderer::init_framebuffers() {
             return false;
         }
 
-        for (int j = 0; j < 7 * Render_Backend::MAX_FRAMES_IN_FLIGHT; j++) {
-            backend->update_descriptor_set(per_scene_uniforms_descriptor_sets[j], i + 1, &shadow_map_buffers[i]);
+        for (int j = 0; j < Render_Backend::MAX_FRAMES_IN_FLIGHT; j++) {
+            for (int r = 0; r < MAX_RESOLVE_PASSES; r++) {
+                backend->update_descriptor_set(per_frame_data[j].per_scene_uniforms_descriptor_sets[r], i + 1, &shadow_map_buffers[i]);
+            }
         }
     }
 
@@ -106,7 +110,7 @@ void Scene_Renderer::render() {
     projection_matrix[1][1] *= -1;
     glm::mat4 view_matrix = get_view_matrix(&camera);
     camera_frustum = get_camera_frustum(projection_matrix * view_matrix);
-
+    
     Per_Scene_Uniforms per_scene_uniforms;
     per_scene_uniforms.projection_matrix = projection_matrix;
     per_scene_uniforms.view_matrix       = view_matrix;
@@ -128,7 +132,7 @@ void Scene_Renderer::render() {
         update_shadow_map_cascade_matrices(&per_scene_uniforms, directional_light);
     }
 
-    Gpu_Buffer *per_scene_uniform_buffer = &per_scene_uniform_buffers[backend->current_frame * 7 + 0];
+    Gpu_Buffer *per_scene_uniform_buffer = &per_frame_data[backend->current_frame].per_scene_uniform_buffers[0];
     backend->update_buffer(per_scene_uniform_buffer, 0, sizeof(per_scene_uniforms), &per_scene_uniforms);
     
     current_render_stage = RENDER_STAGE_SHADOWS;
@@ -148,7 +152,7 @@ void Scene_Renderer::render() {
     begin_rendering(cb, 1, &offscreen_buffer, &depth_buffer, extent, &offscreen_buffer_clear_color, 1.0f, 0);
     current_render_stage = RENDER_STAGE_MAIN;
     {
-        VkDescriptorSet descriptor_set = fullscreen_quad_descriptor_sets[backend->current_frame * 7 + 1];
+        VkDescriptorSet descriptor_set = per_frame_data[backend->current_frame].fullscreen_quad_descriptor_sets[1];
         //backend->update_descriptor_set(descriptor_set, 0, &atmosphere_buffer);
         draw_unit_cube(cb, sky_pipeline, descriptor_set, 0);
     }
@@ -161,7 +165,7 @@ void Scene_Renderer::render() {
     glm::vec4 clear_color = glm::vec4(0, 0, 0, 1);
     begin_rendering(cb, 1, &back_buffer, NULL, extent, &clear_color, 1.0f, 0);
 
-    VkDescriptorSet descriptor_set = fullscreen_quad_descriptor_sets[backend->current_frame * MAX_RESOLVE_PASSES];
+    VkDescriptorSet descriptor_set = per_frame_data[backend->current_frame].fullscreen_quad_descriptor_sets[0];
     backend->update_descriptor_set(descriptor_set, 0, &offscreen_buffer);
     draw_fullscreen_quad(cb, resolve_pipeline, descriptor_set);
     
@@ -298,7 +302,7 @@ void Scene_Renderer::render_all_entities(VkCommandBuffer cb, int cascade_index) 
             pipeline_layout_for_current_pass = mesh_pipeline_layout;
 
             vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_for_current_pass);
-            vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_for_current_pass, 0, 1, &per_scene_uniforms_descriptor_sets[backend->current_frame * 7 + 0], 0, NULL);
+            vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_for_current_pass, 0, 1, &per_frame_data[backend->current_frame].per_scene_uniforms_descriptor_sets[0], 0, NULL);
             
             glm::vec3 world_position = chunk.offset;
             glm::mat4 world_matrix = glm::translate(glm::mat4(1.0f), world_position);
@@ -321,7 +325,7 @@ void Scene_Renderer::render_all_entities(VkCommandBuffer cb, int cascade_index) 
         pipeline_layout_for_current_pass = mesh_instanced_pipeline_layout;
 
         vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_for_current_pass);
-        vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_for_current_pass, 0, 1, &per_scene_uniforms_descriptor_sets[backend->current_frame * 7 + 0], 0, NULL);
+        vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_for_current_pass, 0, 1, &per_frame_data[backend->current_frame].per_scene_uniforms_descriptor_sets[0], 0, NULL);
         for (auto &batch : chunk.batches) {
             MyZoneScopedN("Update data for terrain chunk batches");
             
@@ -362,7 +366,7 @@ void Scene_Renderer::render_all_entities(VkCommandBuffer cb, int cascade_index) 
     pipeline_layout_for_current_pass = mesh_pipeline_layout;
 
     vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_for_current_pass);
-    vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_for_current_pass, 0, 1, &per_scene_uniforms_descriptor_sets[backend->current_frame * 7 + 0], 0, NULL);
+    vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_for_current_pass, 0, 1, &per_frame_data[backend->current_frame].per_scene_uniforms_descriptor_sets[0], 0, NULL);
     
     for (int i = 0; i < render_entities.size(); i++) {
         MyZoneScopedN("Draw single mesh");
@@ -403,10 +407,10 @@ void Scene_Renderer::render_atmosphere_cubemap(VkCommandBuffer cb) {
         per_scene_uniforms.view_matrix  = views[i];
         per_scene_uniforms.cubemap_face = i;
 
-        Gpu_Buffer *per_scene_uniform_buffer = &per_scene_uniform_buffers[backend->current_frame * 7 + 1 + i];
+        Gpu_Buffer *per_scene_uniform_buffer = &per_frame_data[backend->current_frame].per_scene_uniform_buffers[1 + i];
         backend->update_buffer(per_scene_uniform_buffer, 0, sizeof(per_scene_uniforms), &per_scene_uniforms);
 
-        VkDescriptorSet descriptor_set = fullscreen_quad_descriptor_sets[backend->current_frame * 7 + 1 + i];
+        VkDescriptorSet descriptor_set = per_frame_data[backend->current_frame].fullscreen_quad_descriptor_sets[1 + i];
         draw_fullscreen_quad(cb, atmosphere_pipeline, descriptor_set, 1 + i);
         end_rendering(cb);
 
@@ -717,7 +721,7 @@ void Scene_Renderer::draw_mesh_instanced(VkCommandBuffer cb, Mesh *mesh, Gpu_Buf
 
 void Scene_Renderer::draw_fullscreen_quad(VkCommandBuffer cb, VkPipeline pipeline, VkDescriptorSet descriptor_set, int per_scene_uds_index) {
     vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-    vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, fullscreen_quad_pipeline_layout, 0, 1, &per_scene_uniforms_descriptor_sets[backend->current_frame * 7 + per_scene_uds_index], 0, NULL);
+    vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, fullscreen_quad_pipeline_layout, 0, 1, &per_frame_data[backend->current_frame].per_scene_uniforms_descriptor_sets[per_scene_uds_index], 0, NULL);
     vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, fullscreen_quad_pipeline_layout, 1, 1, &descriptor_set, 0, NULL);
 
     VkDeviceSize offset = 0;
@@ -729,7 +733,7 @@ void Scene_Renderer::draw_fullscreen_quad(VkCommandBuffer cb, VkPipeline pipelin
 
 void Scene_Renderer::draw_unit_cube(VkCommandBuffer cb, VkPipeline pipeline, VkDescriptorSet descriptor_set, int per_scene_uds_index) {
     vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-    vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh_pipeline_layout, 0, 1, &per_scene_uniforms_descriptor_sets[backend->current_frame * 7 + per_scene_uds_index], 0, NULL);
+    vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh_pipeline_layout, 0, 1, &per_frame_data[backend->current_frame].per_scene_uniforms_descriptor_sets[per_scene_uds_index], 0, NULL);
     //vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh_pipeline_layout, 1, 1, &descriptor_set, 0, NULL);
 
     VkDeviceSize offset = 0;
@@ -770,17 +774,21 @@ bool Scene_Renderer::create_per_scene_vulkan_objects() {
     if (!backend->create_descriptor_set_layout(&per_scene_uniforms_descriptor_set_layout, (int)per_scene_uniforms_descriptor_set_layout_bindings.size(), per_scene_uniforms_descriptor_set_layout_bindings.data())) {
         return false;
     }
-    
-    if (!backend->create_descriptor_sets(per_scene_uniforms_descriptor_pool, per_scene_uniforms_descriptor_set_layout, 7 * Render_Backend::MAX_FRAMES_IN_FLIGHT, per_scene_uniforms_descriptor_sets)) {
-        return false;
-    }
 
-    for (int i = 0; i < 7 * Render_Backend::MAX_FRAMES_IN_FLIGHT; i++) {
-        if (!backend->create_buffer(&per_scene_uniform_buffers[i], VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT , sizeof(Per_Scene_Uniforms), NULL)) {
+    for (int i = 0; i < Render_Backend::MAX_FRAMES_IN_FLIGHT; i++) {
+        if (!backend->create_descriptor_sets(per_scene_uniforms_descriptor_pool, per_scene_uniforms_descriptor_set_layout, MAX_RESOLVE_PASSES, per_frame_data[i].per_scene_uniforms_descriptor_sets)) {
             return false;
         }
+    }
 
-        backend->update_descriptor_set(per_scene_uniforms_descriptor_sets[i], 0, &per_scene_uniform_buffers[i]);
+    for (int i = 0; i < Render_Backend::MAX_FRAMES_IN_FLIGHT; i++) {
+        for (int j = 0; j < MAX_RESOLVE_PASSES; j++) {
+            if (!backend->create_buffer(&per_frame_data[i].per_scene_uniform_buffers[j], VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, sizeof(Per_Scene_Uniforms), NULL)) {
+                return false;
+            }
+
+            backend->update_descriptor_set(per_frame_data[i].per_scene_uniforms_descriptor_sets[j], 0, &per_frame_data[i].per_scene_uniform_buffers[j]);
+        }
     }
 
     return true;
@@ -843,7 +851,9 @@ bool Scene_Renderer::create_fullscreen_quad_vulkan_objects() {
         return false;
     }
 
-    if (!backend->create_descriptor_sets(fullscreen_quad_descriptor_pool, fullscreen_quad_descriptor_set_layout, MAX_RESOLVE_PASSES * Render_Backend::MAX_FRAMES_IN_FLIGHT, fullscreen_quad_descriptor_sets)) return false;
+    for (int i = 0; i < Render_Backend::MAX_FRAMES_IN_FLIGHT; i++) {
+        if (!backend->create_descriptor_sets(fullscreen_quad_descriptor_pool, fullscreen_quad_descriptor_set_layout, MAX_RESOLVE_PASSES, per_frame_data[i].fullscreen_quad_descriptor_sets)) return false;
+    }
     
     Immediate_Vertex fullscreen_quad_vertices[] = {
         { { -1.0f, -1.0f }, { 1.0f, 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f } },

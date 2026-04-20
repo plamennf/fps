@@ -341,8 +341,22 @@ vec3 calculate_lighting(vec2 frag_uv, vec4 frag_color, vec3 world_normal, mat3 T
 
 #ifdef DO_TERRAIN_AO
     ao = texture(terrain_ao, frag_uv).r;
-#endif
     vec3 ambient = albedo * ao * 0.03;
+#else
+    vec3 ambient    = albedo * ao * 0.03;
+    vec3 irradiance = texture(skybox_texture, N).rgb;
+    ambient += albedo * irradiance * 0.3;
+    
+    {
+        vec3 F0 = mix(vec3(0.04), albedo, metallic);
+        vec3 R  = reflect(-V, N);
+        vec3 prefiltered_color = texture(skybox_texture, R).rgb;
+        vec3 F  = fresnel_schlick(max(dot(N, V), 0.0), F0);
+        vec3 specular = F * prefiltered_color;
+
+        ambient += specular * 0.5;
+    }
+#endif
     vec3 color   = ambient + Lo + emissive;
 
     //const float density  = 0.007;

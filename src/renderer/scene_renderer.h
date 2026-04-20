@@ -80,8 +80,6 @@ private:
     
     VkDescriptorPool per_scene_uniforms_descriptor_pool;
     VkDescriptorSetLayout per_scene_uniforms_descriptor_set_layout;
-    VkDescriptorSet per_scene_uniforms_descriptor_sets[7 * Render_Backend::MAX_FRAMES_IN_FLIGHT];
-    Gpu_Buffer per_scene_uniform_buffers[7 * Render_Backend::MAX_FRAMES_IN_FLIGHT];
     
     VkDescriptorPool material_uniforms_descriptor_pool;
     VkDescriptorSetLayout material_uniforms_descriptor_set_layout;
@@ -96,7 +94,6 @@ private:
 
     VkDescriptorPool fullscreen_quad_descriptor_pool;
     VkDescriptorSetLayout fullscreen_quad_descriptor_set_layout;
-    VkDescriptorSet fullscreen_quad_descriptor_sets[MAX_RESOLVE_PASSES * Render_Backend::MAX_FRAMES_IN_FLIGHT];
     VkPipelineLayout fullscreen_quad_pipeline_layout;
     Gpu_Buffer fullscreen_quad_vertex_buffer;
     Gpu_Buffer fullscreen_quad_index_buffer;
@@ -116,4 +113,12 @@ private:
     Render_Stage current_render_stage;
     VkPipelineLayout pipeline_layout_for_current_pass;
     VkPipeline pipeline_for_current_pass;
+
+    struct Per_Frame_Data {
+        VkDescriptorSet fullscreen_quad_descriptor_sets[MAX_RESOLVE_PASSES];
+        VkDescriptorSet per_scene_uniforms_descriptor_sets[MAX_RESOLVE_PASSES];
+        Gpu_Buffer per_scene_uniform_buffers[MAX_RESOLVE_PASSES];
+    };
+
+    Per_Frame_Data per_frame_data[Render_Backend::MAX_FRAMES_IN_FLIGHT];
 };

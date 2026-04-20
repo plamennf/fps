@@ -397,7 +397,7 @@ int main(int argc, char *argv[]) {
             globals.scene_renderer->add_light(spot_light);
 
             globals.scene_renderer->add_terrain_chunk(&chunk);
-                    
+            
             globals.scene_renderer->render();
             globals.renderer_2d->end_frame();
             
